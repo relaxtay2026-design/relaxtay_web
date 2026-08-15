@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CalendarDays } from "lucide-react";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { imageUrl } from "@/lib/images";
 import { formatMoney } from "@/lib/money";
@@ -36,35 +36,29 @@ export default async function BookingPage({
   const guests =
     typeof sp.guests === "string" ? parseInt(sp.guests, 10) || 2 : 2;
 
-  // Informational validation — the transaction re-checks everything (PRD §5.2)
-  const problem =
-    !checkIn || !checkOut
-      ? "Select your dates to begin."
-      : checkIn < todayUTC()
-        ? "Check-in cannot be in the past."
-        : checkOut <= checkIn
-          ? "Check-out must be after check-in."
-          : quote(property, checkIn, checkOut).nights < property.minNights
-            ? `This property has a minimum stay of ${property.minNights} nights.`
-            : !(await isRangeAvailable(property.id, checkIn, checkOut))
-              ? "These dates are no longer available. Please choose different dates."
-              : null;
-
-  if (problem || !checkIn || !checkOut) {
-    return (
-      <main className="container-page flex min-h-[60vh] flex-col items-center justify-center py-20 text-center">
-        <h1 className="type-headline-lg">{problem}</h1>
-        <Link
-          href={`/properties/${slug}`}
-          className={cn(buttonVariants({ variant: "outline", size: "md" }), "mt-8")}
-        >
-          Back to {property.title}
-        </Link>
-      </main>
-    );
+  // Informational validation. Problems bounce back to the property page
+  // as a small inline notice (?be=code) — never a full error page (impr. #3).
+  function bounce(code: string): never {
+    redirect(`/properties/${slug}?be=${code}#book`);
   }
+  if (!checkIn || !checkOut) bounce("dates");
+  if (checkIn! < todayUTC()) bounce("past");
+  if (checkOut! <= checkIn!) bounce("order");
+  if (quote(property, checkIn!, checkOut!).nights < property.minNights)
+    bounce("min");
+  if (!(await isRangeAvailable(property.id, checkIn!, checkOut!)))
+    bounce("unavail");
 
-  const q = quote(property, checkIn, checkOut);
+  // Prefill for signed-in guests (impr. #5)
+  const session = await auth();
+  const profile = session?.user?.id
+    ? await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true, email: true, phone: true },
+      })
+    : null;
+
+  const q = quote(property, checkIn!, checkOut!);
   const img = property.images[0];
 
   return (
@@ -81,6 +75,11 @@ export default async function BookingPage({
           checkOut={sp.checkOut as string}
           guests={Math.min(Math.max(guests, 1), property.maxGuests)}
           maxGuests={property.maxGuests}
+          prefill={{
+            name: profile?.name ?? "",
+            email: profile?.email ?? "",
+            phone: profile?.phone ?? "",
+          }}
         />
 
         {/* Summary card (mockup 5) */}

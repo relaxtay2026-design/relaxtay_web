@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Eye, EyeOff, Star, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   listAdminProperties,
   listAdminReviews,
@@ -7,7 +8,11 @@ import {
 import { Card, CardSection } from "@/components/ui/card";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
 import { ReviewForm } from "./review-form";
-import { togglePublishAction, deleteReviewAction } from "./actions";
+import {
+  togglePublishAction,
+  toggleFeatureAction,
+  deleteReviewAction,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Admin — Reviews" };
 
@@ -21,8 +26,8 @@ export default async function AdminReviewsPage() {
     <main>
       <h1 className="type-display-md">Reviews</h1>
       <p className="type-body-md text-muted mt-2 max-w-xl">
-        Curated guest words (PRD §46). Verified guest-submitted reviews arrive
-        in a later version.
+        Curated guest words (PRD §46). The bronze star picks which reviews
+        appear in the homepage testimonial strip.
       </p>
 
       <Card className="mt-8 max-w-3xl">
@@ -71,6 +76,27 @@ export default async function AdminReviewsPage() {
                   </TD>
                   <TD>
                     <div className="flex justify-end gap-1.5">
+                      <form action={toggleFeatureAction}>
+                        <input type="hidden" name="reviewId" value={r.id} />
+                        <button
+                          type="submit"
+                          title={
+                            r.isFeatured
+                              ? "Remove from homepage strip"
+                              : "Feature on homepage"
+                          }
+                          className="rounded border border-border-ghost p-1.5 hover:bg-surface-high"
+                        >
+                          <Star
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              r.isFeatured
+                                ? "fill-current text-bronze"
+                                : "text-muted"
+                            )}
+                          />
+                        </button>
+                      </form>
                       <form action={togglePublishAction}>
                         <input type="hidden" name="reviewId" value={r.id} />
                         <button

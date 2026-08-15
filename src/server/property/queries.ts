@@ -58,6 +58,17 @@ export async function getPropertyBySlug(slug: string) {
   return { ...row, ...aggregate(ratings) };
 }
 
+/** Distinct locations of active properties — feeds filter dropdowns. */
+export async function listLocations(): Promise<string[]> {
+  const rows = await db.property.findMany({
+    where: { status: "active" },
+    select: { location: true },
+    distinct: ["location"],
+    orderBy: { location: "asc" },
+  });
+  return rows.map((r) => r.location);
+}
+
 export async function listActiveSlugs() {
   const rows = await db.property.findMany({
     where: { status: "active" },

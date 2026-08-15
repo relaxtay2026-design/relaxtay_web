@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { buttonVariants } from "@/components/ui/button";
+import { ProfileMenu } from "@/components/public/profile-menu";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -13,11 +14,6 @@ const nav = [
 /** Minimal editorial top bar: wordmark, tracked links, one loud CTA. */
 export async function SiteHeader() {
   const session = await auth();
-  const account = session?.user?.id
-    ? session.user.role === "manager"
-      ? { href: "/admin", label: "Dashboard" }
-      : { href: "/account", label: "My stays" }
-    : { href: "/login", label: "Sign in" };
   return (
     <header className="sticky top-0 z-40 border-b border-border-ghost bg-ivory/95 backdrop-blur-sm">
       <div className="container-page flex h-20 items-center justify-between gap-8">
@@ -37,19 +33,22 @@ export async function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-6">
-          <Link
-            href={account.href}
-            className="type-label hidden text-muted transition-colors hover:text-ink sm:block"
-          >
-            {account.label}
-          </Link>
+        <div className="flex items-center gap-5">
           <Link
             href="/properties"
-            className={cn(buttonVariants({ variant: "primary", size: "sm" }))}
+            className={cn(
+              buttonVariants({ variant: "primary", size: "sm" }),
+              "hidden sm:inline-flex"
+            )}
           >
             Book a stay
           </Link>
+          <ProfileMenu
+            signedIn={Boolean(session?.user?.id)}
+            name={session?.user?.name ?? ""}
+            email={session?.user?.email ?? ""}
+            isManager={session?.user?.role === "manager"}
+          />
         </div>
       </div>
     </header>

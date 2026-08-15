@@ -227,6 +227,7 @@ model Review {
   body        String
   stayedMonth String? // e.g. "August 2026"
   isPublished Boolean  @default(true)
+  isFeatured  Boolean  @default(false) // shown in the homepage testimonial strip
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

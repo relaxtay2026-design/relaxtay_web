@@ -139,6 +139,53 @@
   }
 }
 
+/* Testimonial strip: slow seamless loop, pauses on hover/touch.
+   Track holds the list twice; shifting -50% returns to the start. */
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+}
+.marquee::-webkit-scrollbar {
+  display: none;
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 60s linear infinite;
+}
+.marquee:hover .marquee-track,
+.marquee:active .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
 /* react-day-picker themed to Ivory & Bronze */
 .rdp-lumiere {
   --rdp-accent-color: var(--color-ink);

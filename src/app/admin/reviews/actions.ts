@@ -53,6 +53,19 @@ export async function saveReviewAction(
   return { error: null, done: true };
 }
 
+/** Homepage testimonial strip curation (impr. #6). */
+export async function toggleFeatureAction(formData: FormData): Promise<void> {
+  await requireManager();
+  const id = String(formData.get("reviewId"));
+  const review = await db.review.findUnique({ where: { id } });
+  if (!review) return;
+  await db.review.update({
+    where: { id },
+    data: { isFeatured: !review.isFeatured },
+  });
+  await revalidateFor(review.propertyId);
+}
+
 export async function togglePublishAction(formData: FormData): Promise<void> {
   await requireManager();
   const id = String(formData.get("reviewId"));

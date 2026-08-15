@@ -15,12 +15,15 @@ export function BookingForm({
   checkOut,
   guests,
   maxGuests,
+  prefill,
 }: {
   slug: string;
   checkIn: string;
   checkOut: string;
   guests: number;
   maxGuests: number;
+  /** Signed-in guest's profile — pre-filled but editable (impr. #5). */
+  prefill: { name: string; email: string; phone: string };
 }) {
   const [state, formAction, pending] = useActionState(
     submitBooking,
@@ -42,6 +45,7 @@ export function BookingForm({
             required
             autoComplete="name"
             placeholder="Your full name"
+            defaultValue={prefill.name}
           />
         </Field>
         <Field label="Email address" htmlFor="guestEmail">
@@ -52,6 +56,7 @@ export function BookingForm({
             required
             autoComplete="email"
             placeholder="you@example.com"
+            defaultValue={prefill.email}
           />
         </Field>
         <Field label="Phone number" htmlFor="guestPhone">
@@ -62,6 +67,7 @@ export function BookingForm({
             required
             autoComplete="tel"
             placeholder="+1 …"
+            defaultValue={prefill.phone}
           />
         </Field>
         <Field label="Number of guests" htmlFor="guestCount">

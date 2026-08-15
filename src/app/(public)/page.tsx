@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/money";
 import { listActiveProperties } from "@/server/property/queries";
 import { db } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
+import { SearchBar } from "@/components/public/search-bar";
 import { cn } from "@/lib/utils";
 
 export const revalidate = 3600;
@@ -30,12 +31,21 @@ export default async function HomePage() {
   const properties = await listActiveProperties();
   const featured = properties.slice(0, 3);
   const hero = featured[0]?.images[0];
-  const reviews = await db.review.findMany({
-    where: { isPublished: true, rating: 5 },
+  // Manager-curated strip (impr. #6); falls back to recent 5★ if none featured
+  let reviews = await db.review.findMany({
+    where: { isPublished: true, isFeatured: true },
     include: { property: { select: { title: true } } },
     orderBy: { createdAt: "desc" },
-    take: 3,
+    take: 12,
   });
+  if (reviews.length === 0) {
+    reviews = await db.review.findMany({
+      where: { isPublished: true, rating: 5 },
+      include: { property: { select: { title: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+  }
 
   return (
     <main>
@@ -80,40 +90,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Search bar */}
-      <section className="container-page -mt-0 py-10">
-        <form
-          action="/properties"
-          className="flex flex-col gap-4 border border-border-ghost bg-surface-lowest p-4 rounded md:flex-row md:items-end"
-        >
-          <div className="flex-1">
-            <label htmlFor="location" className="type-label text-muted mb-2 block">
-              Location
-            </label>
-            <input
-              id="location"
-              name="location"
-              placeholder="Anywhere in Canada"
-              className="type-body-md h-11 w-full rounded border border-border-input bg-surface-lowest px-4 focus:border-bronze focus:outline-none focus:ring-1 focus:ring-bronze"
-            />
-          </div>
-          <div className="flex-1">
-            <label htmlFor="guests" className="type-label text-muted mb-2 block">
-              Guests
-            </label>
-            <input
-              id="guests"
-              name="guests"
-              type="number"
-              min={1}
-              placeholder="2 guests"
-              className="type-body-md h-11 w-full rounded border border-border-input bg-surface-lowest px-4 focus:border-bronze focus:outline-none focus:ring-1 focus:ring-bronze"
-            />
-          </div>
-          <button type="submit" className={cn(buttonVariants({ size: "md" }))}>
-            Search stays
-          </button>
-        </form>
+      {/* Search bar — floats up over the hero so it's in the first viewport */}
+      <section className="container-page relative z-10 -mt-14 pb-4">
+        <SearchBar
+          properties={properties.map((p) => ({
+            slug: p.slug,
+            title: p.title,
+            maxGuests: p.maxGuests,
+          }))}
+        />
       </section>
 
       {/* Featured stays — editorial alternating layout */}
@@ -197,25 +182,36 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Reviews */}
+      {/* Testimonials — slow auto-scroll loop, pauses on hover (impr. #6) */}
       {reviews.length > 0 && (
-        <section className="container-page py-24">
-          <p className="type-label text-bronze mb-3">Guest words</p>
-          <h2 className="type-display-md mb-16">In their own words</h2>
-          <div className="grid gap-10 md:grid-cols-3">
-            {reviews.map((r) => (
-              <blockquote key={r.id}>
-                <div className="flex gap-1" aria-label={`${r.rating} stars`}>
-                  {Array.from({ length: r.rating }, (_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-current text-bronze" />
-                  ))}
-                </div>
-                <p className="type-body-lg mt-4">“{r.body}”</p>
-                <footer className="type-body-md text-muted mt-4">
-                  {r.authorName} · {r.property.title}
-                </footer>
-              </blockquote>
-            ))}
+        <section className="py-24">
+          <div className="container-page">
+            <p className="type-label text-bronze mb-3">Guest words</p>
+            <h2 className="type-display-md mb-16">In their own words</h2>
+          </div>
+          <div className="marquee">
+            <div className="marquee-track gap-8 pr-8">
+              {[...reviews, ...reviews].map((r, i) => (
+                <blockquote
+                  key={`${r.id}-${i}`}
+                  className="w-80 flex-none rounded border border-border-ghost bg-surface-lowest p-6 sm:w-96"
+                  aria-hidden={i >= reviews.length}
+                >
+                  <div className="flex gap-1" aria-label={`${r.rating} stars`}>
+                    {Array.from({ length: r.rating }, (_, s) => (
+                      <Star
+                        key={s}
+                        className="h-3.5 w-3.5 fill-current text-bronze"
+                      />
+                    ))}
+                  </div>
+                  <p className="type-body-md mt-4">“{r.body}”</p>
+                  <footer className="type-label text-muted mt-4">
+                    {r.authorName} · {r.property.title}
+                  </footer>
+                </blockquote>
+              ))}
+            </div>
           </div>
         </section>
       )}

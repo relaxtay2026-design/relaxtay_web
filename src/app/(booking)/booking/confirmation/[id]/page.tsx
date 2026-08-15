@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CircleCheck, Clock } from "lucide-react";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { imageUrl } from "@/lib/images";
 import { formatMoney } from "@/lib/money";
@@ -36,6 +37,15 @@ export default async function ConfirmationPage({
 
   const img = booking.property.images[0];
   const pending = booking.status === "pending";
+
+  // Suggest an account when the booker isn't signed in (impr. #4)
+  const session = await auth();
+  const bookerAccount = session?.user?.id
+    ? null
+    : await db.user.findUnique({
+        where: { email: booking.guestEmail },
+        select: { accountStatus: true },
+      });
 
   return (
     <main className="container-page flex flex-col items-center py-16">
@@ -93,6 +103,41 @@ export default async function ConfirmationPage({
           </div>
         </CardSection>
       </Card>
+
+      {bookerAccount && (
+        <Card tonal className="mt-8 w-full max-w-md">
+          <CardSection>
+            <h2 className="type-headline-md">Keep track of this stay</h2>
+            {bookerAccount.accountStatus === "active" ? (
+              <>
+                <p className="type-body-md text-muted mt-3">
+                  You already have an account with {booking.guestEmail} — sign
+                  in to see this booking, its status, and your past stays.
+                </p>
+                <Link
+                  href="/login"
+                  className={cn(buttonVariants({ size: "sm" }), "mt-5")}
+                >
+                  Sign in
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="type-body-md text-muted mt-3">
+                  We&apos;ve emailed a personal link to{" "}
+                  <span className="text-ink">{booking.guestEmail}</span> —
+                  claim your account to track this booking, see its status,
+                  and manage future stays. No obligation; your booking stands
+                  either way.
+                </p>
+                <p className="type-label text-muted mt-4">
+                  Look for “Your booking is ready to manage online”
+                </p>
+              </>
+            )}
+          </CardSection>
+        </Card>
+      )}
 
       <Link
         href="/properties"

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { listActiveProperties } from "@/server/property/queries";
+import {
+  listActiveProperties,
+  listLocations,
+} from "@/server/property/queries";
 import { PropertyCard } from "@/components/public/property-card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,12 +31,15 @@ export default async function PropertiesPage({
       ? params.location.trim()
       : undefined;
 
-  const properties = await listActiveProperties({
-    guests,
-    bedrooms,
-    maxPriceCents: maxPrice ? maxPrice * 100 : undefined,
-    location,
-  });
+  const [properties, locations] = await Promise.all([
+    listActiveProperties({
+      guests,
+      bedrooms,
+      maxPriceCents: maxPrice ? maxPrice * 100 : undefined,
+      location,
+    }),
+    listLocations(),
+  ]);
 
   const hasFilters = Boolean(guests || bedrooms || maxPrice || location);
 
@@ -55,13 +61,19 @@ export default async function PropertiesPage({
           <label htmlFor="location" className="type-label text-muted mb-2 block">
             Location
           </label>
-          <input
+          <select
             id="location"
             name="location"
             defaultValue={location ?? ""}
-            placeholder="Anywhere"
-            className="type-body-md h-10 w-40 rounded border border-border-input bg-surface-lowest px-3 focus:border-bronze focus:outline-none focus:ring-1 focus:ring-bronze"
-          />
+            className="type-body-md h-10 w-48 rounded border border-border-input bg-surface-lowest px-3 focus:border-bronze focus:outline-none focus:ring-1 focus:ring-bronze"
+          >
+            <option value="">Anywhere</option>
+            {locations.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="guests" className="type-label text-muted mb-2 block">
