@@ -8,6 +8,7 @@ import {
   BookingRequestGuestEmail,
   BookingRequestManagerEmail,
 } from "@/components/email/booking-request";
+import { sendClaimInvitation } from "@/server/auth/account";
 
 /** Input schema — shared by the server action (PRD §5.2). */
 export const createBookingSchema = z.object({
@@ -70,7 +71,7 @@ export async function createBooking(
   const email = input.guestEmail.toLowerCase();
 
   try {
-    const booking = await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       // Blocks aren't covered by the exclusion constraint — check here,
       // inside the transaction (manager-only writes; race window ~nil).
       const block = await tx.availabilityBlock.findFirst({
@@ -82,6 +83,11 @@ export async function createBooking(
         select: { id: true },
       });
       if (block) throw new DatesTakenError();
+
+      const existed = await tx.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
 
       // Upsert customer by email (PRD §6.4 / §25)
       const user = await tx.user.upsert({
@@ -102,7 +108,7 @@ export async function createBooking(
       });
 
       // The exclusion constraint fires on overlap with pending/confirmed
-      return tx.booking.create({
+      const row = await tx.booking.create({
         data: {
           code: await nextCode(tx),
           propertyId: property.id,
@@ -120,7 +126,9 @@ export async function createBooking(
           status: "pending",
         },
       });
+      return { row, isNewCustomer: !existed };
     });
+    const booking = result.row;
 
     // Post-commit notifications — must not fail the booking
     const emailData = {
@@ -155,6 +163,11 @@ export async function createBooking(
           />
         ),
       }),
+      // First booking from this email → invite them to claim the account
+      // (PRD §25). Fire-and-forget like the rest.
+      ...(result.isNewCustomer
+        ? [sendClaimInvitation(booking.guestEmail, booking.guestName)]
+        : []),
     ]);
 
     return { ok: true, bookingId: booking.id };

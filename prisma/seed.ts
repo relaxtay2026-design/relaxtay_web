@@ -9,6 +9,7 @@
 import "dotenv/config";
 import { PrismaClient, BookingStatus } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -265,13 +266,22 @@ async function main() {
   await db.amenity.deleteMany();
   await db.user.deleteMany();
 
-  // Manager (credentials/Google get attached in Phase 5)
+  // Manager with dev credentials (change password before production!)
+  const managerPassword = process.env.SEED_MANAGER_PASSWORD ?? "manager123";
   const manager = await db.user.create({
     data: {
       name: "Property Manager",
       email: "manager@example.com",
       role: "manager",
       accountStatus: "active",
+      accounts: {
+        create: {
+          type: "credentials",
+          provider: "credentials",
+          providerAccountId: "manager@example.com",
+          passwordHash: await bcrypt.hash(managerPassword, 12),
+        },
+      },
     },
   });
 
