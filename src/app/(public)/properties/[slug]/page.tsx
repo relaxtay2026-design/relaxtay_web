@@ -12,7 +12,7 @@ import { Gallery } from "@/components/public/gallery";
 import { AmenityIcon } from "@/components/public/amenity-icon";
 import { BookingCard } from "@/components/public/booking-card";
 import { Divider } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export const revalidate = 3600;
 
@@ -217,6 +217,8 @@ export default async function PropertyPage({
         <aside className="hidden lg:block">
           <div className="sticky top-28">
             <BookingCard
+              propertyId={property.id}
+              slug={property.slug}
               priceCents={property.priceCents}
               currency={property.currency}
               maxGuests={property.maxGuests}
@@ -225,6 +227,18 @@ export default async function PropertyPage({
           </div>
         </aside>
       </div>
+
+      {/* Mobile: booking card inline, reached via the bottom bar */}
+      <section id="book" className="mt-12 scroll-mt-24 lg:hidden">
+        <BookingCard
+          propertyId={property.id}
+          slug={property.slug}
+          priceCents={property.priceCents}
+          currency={property.currency}
+          maxGuests={property.maxGuests}
+          minNights={property.minNights}
+        />
+      </section>
 
       {/* Mobile sticky bottom bar (PRD §61) — 1px top border, no shadow */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border-ghost bg-ivory px-5 py-4 lg:hidden">
@@ -235,7 +249,9 @@ export default async function PropertyPage({
             </span>
             <span className="type-body-md text-muted"> / night</span>
           </p>
-          <Button disabled>Request this stay</Button>
+          <a href="#book" className={buttonVariants({ size: "md" })}>
+            Request this stay
+          </a>
         </div>
       </div>
     </main>

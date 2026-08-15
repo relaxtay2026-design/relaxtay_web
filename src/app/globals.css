@@ -139,6 +139,24 @@
   }
 }
 
+/* react-day-picker themed to Ivory & Bronze */
+.rdp-lumiere {
+  --rdp-accent-color: var(--color-ink);
+  --rdp-accent-background-color: var(--color-surface-high);
+  --rdp-today-color: var(--color-bronze);
+  --rdp-selected-border: 1px solid var(--color-ink);
+  --rdp-range_start-color: var(--color-ivory);
+  --rdp-range_start-background: var(--color-ink);
+  --rdp-range_end-color: var(--color-ivory);
+  --rdp-range_end-background: var(--color-ink);
+  --rdp-range_middle-background-color: var(--color-surface-high);
+  --rdp-disabled-opacity: 0.35;
+  --rdp-day-width: 38px;
+  --rdp-day-height: 38px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
 @layer base {
   body {
     background: var(--color-ivory);

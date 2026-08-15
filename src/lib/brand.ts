@@ -11,4 +11,6 @@ export const brand = {
     "Curating exceptional spaces for those who appreciate the quiet luxury of thoughtful design and uncompromising comfort.",
   /** Transactional sender + reply-to. Swap when the domain is real. */
   email: "stays@example.com",
+  /** Booking reference prefix: LUM-10482 style. */
+  bookingPrefix: "LUM",
 } as const;
