@@ -10,6 +10,7 @@ import {
   moveImageAction,
   setPrimaryImageAction,
 } from "../actions";
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,28 +41,10 @@ export function ImageManager({
     setError(null);
     try {
       for (const file of Array.from(files)) {
-        if (file.size > 10 * 1024 * 1024)
-          throw new Error(`${file.name} is over 10 MB.`);
-        const signRes = await fetch("/api/uploads/sign", { method: "POST" });
-        if (!signRes.ok) throw new Error("Could not sign upload.");
-        const sign = await signRes.json();
-
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("api_key", sign.apiKey);
-        fd.append("timestamp", String(sign.timestamp));
-        fd.append("folder", sign.folder);
-        fd.append("signature", sign.signature);
-        const up = await fetch(
-          `https://api.cloudinary.com/v1_1/${sign.cloudName}/image/upload`,
-          { method: "POST", body: fd }
-        );
-        if (!up.ok) throw new Error(`Upload of ${file.name} failed.`);
-        const result = await up.json();
-
+        const publicId = await uploadToCloudinary(file);
         const save = new FormData();
         save.append("propertyId", propertyId);
-        save.append("src", result.public_id);
+        save.append("src", publicId);
         save.append("alt", file.name.replace(/\.[a-z]+$/i, ""));
         await addImageAction(save);
       }

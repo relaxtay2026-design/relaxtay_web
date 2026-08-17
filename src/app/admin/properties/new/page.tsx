@@ -20,6 +20,7 @@ export default async function NewPropertyPage() {
       <h1 className="type-display-md mt-6 mb-10">Add property</h1>
       <PropertyForm
         amenities={amenities}
+        cloudinaryEnabled={Boolean(process.env.CLOUDINARY_CLOUD_NAME)}
         values={{
           title: "",
           location: "",
@@ -36,9 +37,6 @@ export default async function NewPropertyPage() {
           amenityIds: [],
         }}
       />
-      <p className="type-body-md text-muted mt-8 max-w-xl">
-        Photos are added after saving, on the property&apos;s edit page.
-      </p>
     </main>
   );
 }

@@ -9,6 +9,7 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { StatusToggle } from "./status-toggle";
 
 export const metadata: Metadata = { title: "Admin — Properties" };
 
@@ -71,12 +72,19 @@ export default async function AdminPropertiesPage() {
                   </StatusChip>
                 </TD>
                 <TD className="text-right">
-                  <Link
-                    href={`/admin/properties/${p.id}`}
-                    className="type-label underline underline-offset-4 hover:text-bronze"
-                  >
-                    Edit
-                  </Link>
+                  <div className="flex items-center justify-end gap-4">
+                    <StatusToggle
+                      propertyId={p.id}
+                      title={p.title}
+                      active={p.status === "active"}
+                    />
+                    <Link
+                      href={`/admin/properties/${p.id}`}
+                      className="type-label underline underline-offset-4 hover:text-bronze"
+                    >
+                      Edit
+                    </Link>
+                  </div>
                 </TD>
               </tr>
             ))}

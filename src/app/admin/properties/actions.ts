@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { z } from "zod";
 import { requireManager } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { propertySchema, pendingImagesSchema } from "./property-schema";
 
-export type PropertyFormState = { error: string | null; saved?: boolean };
+export type PropertyFormState = {
+  error: string | null;
+  /** Set on success — the client clears its draft then routes here. */
+  savedId?: string;
+};
 
 /** Public pages that must reflect admin edits (SSG w/ revalidate). */
 function revalidatePublic(slug?: string) {
@@ -15,22 +18,6 @@ function revalidatePublic(slug?: string) {
   if (slug) revalidatePath(`/properties/${slug}`);
   revalidatePath("/admin/properties");
 }
-
-const propertySchema = z.object({
-  id: z.string().optional().or(z.literal("")),
-  title: z.string().trim().min(3).max(120),
-  location: z.string().trim().min(3).max(160),
-  summary: z.string().trim().min(10).max(300),
-  description: z.string().trim().min(20).max(8000),
-  price: z.coerce.number().min(1).max(1_000_000), // dollars in the form
-  currency: z.enum(["USD", "CAD"]),
-  maxGuests: z.coerce.number().int().min(1).max(50),
-  bedrooms: z.coerce.number().int().min(0).max(50),
-  beds: z.coerce.number().int().min(1).max(100),
-  bathrooms: z.coerce.number().int().min(1).max(50),
-  minNights: z.coerce.number().int().min(1).max(60),
-  status: z.enum(["active", "inactive"]),
-});
 
 function slugify(title: string): string {
   return title
@@ -79,6 +66,16 @@ export async function savePropertyAction(
     status: d.status,
   };
 
+  // Photos added on the New form before the property exists (impr. A3)
+  let pendingImages: { src: string; alt: string }[] = [];
+  try {
+    pendingImages = pendingImagesSchema.parse(
+      JSON.parse(String(formData.get("pendingImages") ?? "[]"))
+    );
+  } catch {
+    pendingImages = [];
+  }
+
   let slug: string;
   let id: string;
   if (d.id) {
@@ -103,13 +100,21 @@ export async function savePropertyAction(
         amenities: {
           create: amenityIds.map((amenityId) => ({ amenityId })),
         },
+        images: {
+          create: pendingImages.map((img, i) => ({
+            src: img.src,
+            alt: img.alt || d.title,
+            sortOrder: i,
+            isPrimary: i === 0,
+          })),
+        },
       },
     });
     id = created.id;
   }
 
   revalidatePublic(slug);
-  redirect(`/admin/properties/${id}?saved=1`);
+  return { error: null, savedId: id };
 }
 
 export async function setPropertyStatusAction(formData: FormData): Promise<void> {

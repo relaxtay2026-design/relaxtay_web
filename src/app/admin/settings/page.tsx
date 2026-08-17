@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/brand";
+import { db } from "@/lib/db";
 import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip } from "@/components/ui/status-chip";
+import { AmenitiesManager } from "./amenities-manager";
 
 export const metadata: Metadata = { title: "Admin — Settings" };
 
@@ -27,13 +29,38 @@ function EnvRow({
   );
 }
 
-export default function AdminSettingsPage() {
+export default async function AdminSettingsPage() {
+  const amenities = await db.amenity.findMany({
+    include: { _count: { select: { properties: true } } },
+    orderBy: { sortOrder: "asc" },
+  });
+
   return (
     <main className="max-w-2xl">
       <h1 className="type-display-md">Settings</h1>
-      <p className="type-body-md text-muted mt-2">
-        Service configuration lives in the server environment (.env) — this
-        page shows what&apos;s wired up.
+
+      <section className="mt-10">
+        <h2 className="type-headline-md mb-1">Amenities</h2>
+        <p className="type-body-md text-muted mb-6">
+          The global list properties choose from. Renames apply everywhere
+          instantly.
+        </p>
+        <Card>
+          <CardSection>
+            <AmenitiesManager
+              amenities={amenities.map((a) => ({
+                id: a.id,
+                name: a.name,
+                usageCount: a._count.properties,
+              }))}
+            />
+          </CardSection>
+        </Card>
+      </section>
+
+      <p className="type-body-md text-muted mt-12">
+        Service configuration lives in the server environment (.env) — below
+        shows what&apos;s wired up.
       </p>
 
       <Card className="mt-8">
