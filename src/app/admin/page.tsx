@@ -105,7 +105,7 @@ export default async function AdminDashboardPage() {
                   <TD>
                     <Link
                       href={`/admin/bookings/${b.id}`}
-                      className="hover:underline"
+                      className="underline underline-offset-4 decoration-outline-variant hover:decoration-ink"
                     >
                       {b.guestName}
                     </Link>

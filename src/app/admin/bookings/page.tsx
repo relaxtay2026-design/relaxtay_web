@@ -11,6 +11,7 @@ import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { QuickActions } from "./quick-actions";
 
 export const metadata: Metadata = { title: "Admin — Bookings" };
 
@@ -105,6 +106,7 @@ export default async function AdminBookingsPage({
                 <TH>Guests</TH>
                 <TH>Status</TH>
                 <TH className="text-right">Total</TH>
+                <TH className="text-right">Actions</TH>
               </tr>
             </THead>
             <TBody>
@@ -113,7 +115,7 @@ export default async function AdminBookingsPage({
                   <TD>
                     <Link
                       href={`/admin/bookings/${b.id}`}
-                      className="font-medium hover:underline"
+                      className="font-medium underline underline-offset-4 decoration-outline-variant hover:decoration-ink"
                     >
                       {b.code}
                     </Link>
@@ -137,6 +139,18 @@ export default async function AdminBookingsPage({
                   </TD>
                   <TD className="text-right">
                     {formatMoney(b.totalCents, b.currency)}
+                  </TD>
+                  <TD className="text-right">
+                    {b.status === "pending" ? (
+                      <QuickActions bookingId={b.id} />
+                    ) : (
+                      <Link
+                        href={`/admin/bookings/${b.id}`}
+                        className="type-label underline underline-offset-4 text-muted hover:text-ink"
+                      >
+                        View
+                      </Link>
+                    )}
                   </TD>
                 </tr>
               ))}
