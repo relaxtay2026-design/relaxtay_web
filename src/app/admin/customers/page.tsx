@@ -4,6 +4,7 @@ import { listCustomers } from "@/server/admin/queries";
 import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
+import { ClickableRow } from "@/components/admin/clickable-row";
 
 export const metadata: Metadata = { title: "Admin — Customers" };
 
@@ -42,7 +43,7 @@ export default async function CustomersPage() {
             </THead>
             <TBody>
               {customers.map((c) => (
-                <tr key={c.id} className="hover:bg-surface-low">
+                <ClickableRow key={c.id} href={`/admin/customers/${c.id}`}>
                   <TD>
                     <Link
                       href={`/admin/customers/${c.id}`}
@@ -71,7 +72,7 @@ export default async function CustomersPage() {
                   <TD className="type-label text-muted">
                     {c.marketingOptIn ? "Subscribed" : "—"}
                   </TD>
-                </tr>
+                </ClickableRow>
               ))}
             </TBody>
           </Table>

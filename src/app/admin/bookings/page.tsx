@@ -12,6 +12,7 @@ import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { QuickActions } from "./quick-actions";
+import { ClickableRow } from "@/components/admin/clickable-row";
 
 export const metadata: Metadata = { title: "Admin — Bookings" };
 
@@ -111,7 +112,7 @@ export default async function AdminBookingsPage({
             </THead>
             <TBody>
               {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-surface-low">
+                <ClickableRow key={b.id} href={`/admin/bookings/${b.id}`}>
                   <TD>
                     <Link
                       href={`/admin/bookings/${b.id}`}
@@ -152,7 +153,7 @@ export default async function AdminBookingsPage({
                       </Link>
                     )}
                   </TD>
-                </tr>
+                </ClickableRow>
               ))}
             </TBody>
           </Table>

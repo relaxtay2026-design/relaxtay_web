@@ -10,6 +10,7 @@ import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StatusToggle } from "./status-toggle";
+import { ClickableRow } from "@/components/admin/clickable-row";
 
 export const metadata: Metadata = { title: "Admin — Properties" };
 
@@ -42,7 +43,7 @@ export default async function AdminPropertiesPage() {
           </THead>
           <TBody>
             {properties.map((p) => (
-              <tr key={p.id} className="hover:bg-surface-low">
+              <ClickableRow key={p.id} href={`/admin/properties/${p.id}`}>
                 <TD>
                   <div className="flex items-center gap-3">
                     {p.images[0] && (
@@ -86,7 +87,7 @@ export default async function AdminPropertiesPage() {
                     </Link>
                   </div>
                 </TD>
-              </tr>
+              </ClickableRow>
             ))}
           </TBody>
         </Table>
