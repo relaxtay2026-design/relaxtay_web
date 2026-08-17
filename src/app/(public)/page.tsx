@@ -18,8 +18,8 @@ export const revalidate = 3600;
  * signature photograph when brand photography lands.
  */
 const HERO = {
-  url: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=2400&auto=format&fit=crop",
-  alt: "A timber boathouse on a turquoise alpine lake beneath mountain peaks",
+  url: "https://picsum.photos/seed/old-quebec-pied-a-terre-3/2400/1600",
+  alt: "Palm trees against a soft dusk sky",
 };
 
 const whyDirect = [
