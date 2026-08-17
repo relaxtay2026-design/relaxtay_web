@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       // Seed placeholder photography; replaced by Cloudinary in Phase 6
       { protocol: "https", hostname: "picsum.photos" },
       { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "images.unsplash.com" }, // curated hero
     ],
   },
 };

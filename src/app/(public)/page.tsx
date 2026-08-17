@@ -12,6 +12,16 @@ import { cn } from "@/lib/utils";
 
 export const revalidate = 3600;
 
+/**
+ * Curated brand hero — deliberately independent of property data so the
+ * homepage doesn't change when photos are reordered. Swap for the real
+ * signature photograph when brand photography lands.
+ */
+const HERO = {
+  url: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=2400&auto=format&fit=crop",
+  alt: "A timber boathouse on a turquoise alpine lake beneath mountain peaks",
+};
+
 const whyDirect = [
   {
     title: "Direct with the host",
@@ -30,7 +40,6 @@ const whyDirect = [
 export default async function HomePage() {
   const properties = await listActiveProperties();
   const featured = properties.slice(0, 3);
-  const hero = featured[0]?.images[0];
   // Manager-curated strip (impr. #6); falls back to recent 5★ if none featured
   let reviews = await db.review.findMany({
     where: { isPublished: true, isFeatured: true },
@@ -51,17 +60,15 @@ export default async function HomePage() {
     <main>
       {/* Hero */}
       <section className="relative flex min-h-[85vh] items-end">
-        {hero && (
-          <Image
-            src={imageUrl(hero.src)}
-            alt={hero.alt}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/10 to-transparent" />
+        <Image
+          src={HERO.url}
+          alt={HERO.alt}
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/10 to-transparent" />
         <div className="container-page relative pb-24 text-ivory">
           <p className="type-label mb-4 text-ivory/80">{brand.legalName}</p>
           <h1 className="type-display-lg max-w-3xl">
