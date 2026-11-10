@@ -2,27 +2,70 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CircleUserRound, LayoutDashboard, LogOut, Luggage, User } from "lucide-react";
 import { signOutAction } from "@/app/(public)/account/actions";
 import { cn } from "@/lib/utils";
 
+type SessionUser = { name: string; email: string; isManager: boolean };
+
+/** undefined = not known yet, null = signed out. */
+type SessionState = SessionUser | null | undefined;
+
+async function fetchSessionUser(): Promise<SessionUser | null> {
+  try {
+    const res = await fetch("/api/auth/session", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      user?: { id?: string; name?: string; email?: string; role?: string };
+    } | null;
+    if (!data?.user?.id) return null;
+    return {
+      name: data.user.name ?? "",
+      email: data.user.email ?? "",
+      isManager: data.user.role === "manager",
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Signed-in clarity (impr. #4): an avatar with your initial that opens a
  * small menu — you always know whether (and as whom) you're signed in.
+ *
+ * The session is read here in the browser, not on the server, so the pages
+ * around this header stay cacheable. Signed-out visitors cost one small
+ * request per visit; for signed-in guests it is re-checked on navigation
+ * so a changed name or an ended session shows up.
  */
-export function ProfileMenu({
-  signedIn,
-  name,
-  email,
-  isManager,
-}: {
-  signedIn: boolean;
-  name: string;
-  email: string;
-  isManager: boolean;
-}) {
+export function ProfileMenu() {
+  const [session, setSession] = React.useState<SessionState>(undefined);
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const signedInRef = React.useRef(false);
+  const loadedRef = React.useRef(false);
+  // This header outlives the navigation that follows sign-out (and there is
+  // no navigation at all when signing out on the home page), so the end of
+  // the sign-out transition is what triggers the re-check below.
+  const [signingOut, startSignOut] = React.useTransition();
+
+  React.useEffect(() => {
+    // First load always; afterwards only signed-in sessions are re-checked.
+    if (signingOut) return;
+    if (loadedRef.current && !signedInRef.current) return;
+    let cancelled = false;
+    fetchSessionUser().then((user) => {
+      if (cancelled) return;
+      loadedRef.current = true;
+      signedInRef.current = user !== null;
+      setSession(user);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, signingOut]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -39,7 +82,12 @@ export function ProfileMenu({
     };
   }, [open]);
 
-  if (!signedIn) {
+  if (session === undefined) {
+    // Same footprint as the avatar, so nothing shifts when the answer lands.
+    return <span aria-hidden className="block h-9 w-9" />;
+  }
+
+  if (session === null) {
     return (
       <Link
         href="/login"
@@ -52,6 +100,7 @@ export function ProfileMenu({
     );
   }
 
+  const { name, email, isManager } = session;
   const initial = (name || email || "?").trim().charAt(0).toUpperCase();
 
   return (
@@ -101,9 +150,13 @@ export function ProfileMenu({
               Profile
             </MenuLink>
           </nav>
-          <form action={signOutAction} className="border-t border-divider py-1.5">
+          <form
+            action={() => startSignOut(() => signOutAction())}
+            className="border-t border-divider py-1.5"
+          >
             <button
               type="submit"
+              disabled={signingOut}
               className="type-body-md flex w-full items-center gap-3 px-4 py-2 text-muted transition-colors hover:bg-surface-low hover:text-ink"
             >
               <LogOut className="h-4 w-4" strokeWidth={1.5} />
