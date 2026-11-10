@@ -58,12 +58,45 @@ export async function rateLimit(opts: {
  */
 export async function clientIp(): Promise<string | null> {
   try {
-    const h = await headers();
-    const forwarded = h.get("x-forwarded-for")?.split(",")[0]?.trim();
-    return forwarded || h.get("x-real-ip")?.trim() || null;
+    return ipFromHeaders(await headers());
   } catch {
     return null; // not in a request scope
   }
+}
+
+/** Same as clientIp(), for code that already holds the request headers. */
+export function ipFromHeaders(h: Headers): string | null {
+  const forwarded = h.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || h.get("x-real-ip")?.trim() || null;
+}
+
+/**
+ * Limits for the account flows. Each is checked per IP address and, where
+ * an email is involved, per email address — so neither one visitor hammering
+ * many accounts nor many visitors hammering one account gets far.
+ */
+export const AUTH_LIMITS = {
+  /** Sign-in attempts. */
+  loginPerIp: { limit: 10, windowSeconds: 15 * 60 },
+  loginPerEmail: { limit: 20, windowSeconds: 60 * 60 },
+  /** New accounts. */
+  registerPerIp: { limit: 5, windowSeconds: 60 * 60 },
+  /** Password-reset and claim emails. */
+  emailPerIp: { limit: 5, windowSeconds: 60 * 60 },
+  emailPerAddress: { limit: 3, windowSeconds: 60 * 60 },
+} as const;
+
+/**
+ * True when the caller is within `rule` for `action`. A null subject (no
+ * IP available, e.g. local scripts) is not limited.
+ */
+export async function withinLimit(
+  action: string,
+  subject: string | null,
+  rule: { limit: number; windowSeconds: number }
+): Promise<boolean> {
+  if (!subject) return true;
+  return (await rateLimit({ action, subject, ...rule })).ok;
 }
 
 /** IPs and emails are personal data — store only a hash of them. */

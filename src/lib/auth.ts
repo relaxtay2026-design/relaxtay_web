@@ -1,11 +1,17 @@
 import { cache } from "react";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/server/auth/passwords";
+import { AUTH_LIMITS, ipFromHeaders, withinLimit } from "@/lib/rate-limit";
+
+/** Thrown from authorize() when sign-in attempts are being throttled. */
+export class TooManyAttempts extends CredentialsSignin {
+  code = "rate_limited";
+}
 
 /**
  * Auth.js v5 (PRD §6.2): Google + credentials against the same User,
@@ -15,10 +21,18 @@ import { verifyPassword } from "@/server/auth/passwords";
 const providers = [
   Credentials({
     credentials: { email: {}, password: {} },
-    async authorize(credentials) {
+    async authorize(credentials, request) {
       const email = String(credentials?.email ?? "").toLowerCase().trim();
       const password = String(credentials?.password ?? "");
       if (!email || !password) return null;
+
+      // Throttle here, not in the login action: this also covers direct
+      // posts to /api/auth/callback/credentials.
+      const ip = ipFromHeaders(request.headers);
+      const allowed =
+        (await withinLimit("login-ip", ip, AUTH_LIMITS.loginPerIp)) &&
+        (await withinLimit("login-email", email, AUTH_LIMITS.loginPerEmail));
+      if (!allowed) throw new TooManyAttempts();
 
       const user = await db.user.findUnique({
         where: { email },

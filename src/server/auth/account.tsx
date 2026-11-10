@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { AUTH_LIMITS, withinLimit } from "@/lib/rate-limit";
 import { hashPassword, PASSWORD_MIN } from "./passwords";
 import { createToken, consumeToken, peekToken } from "./tokens";
 import {
@@ -68,6 +69,9 @@ export async function registerUser(
 
 /** Send (or re-send) the account-claim invitation (PRD §25). */
 export async function sendClaimInvitation(email: string, guestName: string) {
+  // Cap how often one inbox can be sent this (register re-sends it on demand)
+  if (!(await withinLimit("claim-email", email, AUTH_LIMITS.emailPerAddress)))
+    return;
   const raw = await createToken(email, "claim");
   await sendEmail({
     to: email,
@@ -140,6 +144,10 @@ export async function requestPasswordReset(email: string): Promise<void> {
     where: { email: email.toLowerCase() },
   });
   if (!user || user.accountStatus === "disabled") return;
+  // Silently skip beyond the cap — the caller always reports success, so
+  // this neither floods the inbox nor reveals whether the account exists.
+  if (!(await withinLimit("reset-email", user.email, AUTH_LIMITS.emailPerAddress)))
+    return;
   const raw = await createToken(user.email, "reset");
   await sendEmail({
     to: user.email,
