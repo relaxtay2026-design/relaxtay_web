@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Image from "next/image";
 import Link from "next/link";
 import { listAdminProperties } from "@/server/admin/queries";
@@ -15,6 +16,7 @@ import { ClickableRow } from "@/components/admin/clickable-row";
 export const metadata: Metadata = { title: "Admin — Properties" };
 
 export default async function AdminPropertiesPage() {
+  await requireManager();
   const properties = await listAdminProperties();
 
   return (

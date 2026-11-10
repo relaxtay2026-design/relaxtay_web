@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -15,6 +16,7 @@ export const metadata: Metadata = { title: "Admin — Customer" };
 export default async function CustomerDetailPage({
   params,
 }: PageProps<"/admin/customers/[id]">) {
+  await requireManager();
   const { id } = await params;
   const c = await getCustomer(id);
   if (!c) notFound();

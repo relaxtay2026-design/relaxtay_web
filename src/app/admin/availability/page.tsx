@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { listAdminProperties, listBlocks } from "@/server/admin/queries";
@@ -18,6 +19,7 @@ export const metadata: Metadata = { title: "Admin — Availability" };
 export default async function AvailabilityPage({
   searchParams,
 }: PageProps<"/admin/availability">) {
+  await requireManager();
   const sp = await searchParams;
   const properties = await listAdminProperties();
   const selectedId =

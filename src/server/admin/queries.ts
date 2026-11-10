@@ -1,10 +1,18 @@
 import { db } from "@/lib/db";
+import { requireManager } from "@/lib/auth";
 import { todayUTC } from "@/lib/dates";
 import { sweepCompleted } from "@/server/booking/transitions";
 import type { BookingStatus, Prisma } from "@prisma/client";
 
+/**
+ * Admin data layer. Every function here starts with requireManager(), so the
+ * data is protected even if a page forgets its own check (the admin layout
+ * alone is not enough — layouts are skipped on client-side navigation).
+ */
+
 /** Dashboard stat cards (mock 7). */
 export async function getDashboardStats() {
+  await requireManager();
   await sweepCompleted();
   const today = todayUTC();
   const [activeProperties, upcoming, pending] = await Promise.all([
@@ -33,6 +41,7 @@ export async function listAdminBookings(
   tab: AdminBookingTab,
   propertyId?: string
 ) {
+  await requireManager();
   await sweepCompleted();
   const today = todayUTC();
   const where: Prisma.BookingWhereInput = {
@@ -56,7 +65,8 @@ export async function listAdminBookings(
   });
 }
 
-export function getAdminBooking(id: string) {
+export async function getAdminBooking(id: string) {
+  await requireManager();
   return db.booking.findUnique({
     where: { id },
     include: {
@@ -67,7 +77,8 @@ export function getAdminBooking(id: string) {
 }
 
 /** Upcoming table on the dashboard. */
-export function listUpcomingBookings(limit = 8) {
+export async function listUpcomingBookings(limit = 8) {
+  await requireManager();
   return db.booking.findMany({
     where: {
       status: { in: ["pending", "confirmed"] },
@@ -79,7 +90,8 @@ export function listUpcomingBookings(limit = 8) {
   });
 }
 
-export function listAdminProperties() {
+export async function listAdminProperties() {
+  await requireManager();
   return db.property.findMany({
     include: {
       images: { orderBy: { sortOrder: "asc" as const }, take: 1 },
@@ -89,7 +101,8 @@ export function listAdminProperties() {
   });
 }
 
-export function getAdminProperty(id: string) {
+export async function getAdminProperty(id: string) {
+  await requireManager();
   return db.property.findUnique({
     where: { id },
     include: {
@@ -99,12 +112,14 @@ export function getAdminProperty(id: string) {
   });
 }
 
-export function listAmenities() {
+export async function listAmenities() {
+  await requireManager();
   return db.amenity.findMany({ orderBy: { sortOrder: "asc" } });
 }
 
 /** Customers with booking aggregates (PRD §45). */
 export async function listCustomers() {
+  await requireManager();
   const users = await db.user.findMany({
     where: { role: "guest" },
     include: {
@@ -128,7 +143,8 @@ export async function listCustomers() {
   }));
 }
 
-export function getCustomer(id: string) {
+export async function getCustomer(id: string) {
+  await requireManager();
   return db.user.findUnique({
     where: { id, role: "guest" },
     include: {
@@ -140,7 +156,8 @@ export function getCustomer(id: string) {
   });
 }
 
-export function listAdminReviews(propertyId?: string) {
+export async function listAdminReviews(propertyId?: string) {
+  await requireManager();
   return db.review.findMany({
     where: propertyId ? { propertyId } : {},
     include: { property: { select: { title: true } } },
@@ -148,7 +165,8 @@ export function listAdminReviews(propertyId?: string) {
   });
 }
 
-export function listBlocks(propertyId: string) {
+export async function listBlocks(propertyId: string) {
+  await requireManager();
   return db.availabilityBlock.findMany({
     where: { propertyId, endDate: { gte: todayUTC() } },
     orderBy: { startDate: "asc" },

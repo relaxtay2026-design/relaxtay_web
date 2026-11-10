@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -14,6 +15,7 @@ export default async function EditPropertyPage({
   params,
   searchParams,
 }: PageProps<"/admin/properties/[id]">) {
+  await requireManager();
   const { id } = await params;
   const sp = await searchParams;
   const [property, amenities] = await Promise.all([

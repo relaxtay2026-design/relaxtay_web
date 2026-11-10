@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import { listCustomers } from "@/server/admin/queries";
 import { Card, CardSection } from "@/components/ui/card";
@@ -15,6 +16,7 @@ const statusChip = {
 } as const;
 
 export default async function CustomersPage() {
+  await requireManager();
   const customers = await listCustomers();
 
   return (

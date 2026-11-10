@@ -1,3 +1,4 @@
+import { cache } from "react";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -88,16 +89,29 @@ export const googleEnabled = Boolean(
   process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
 );
 
+/**
+ * One session lookup per request, however many gates run. Layouts, pages
+ * and the admin data layer all call the gates below; React's cache()
+ * collapses those into a single auth() (and a single DB read) per render.
+ */
+const getSession = cache(() => auth());
+
 /** Server-side gate for /account/** — redirects to login (PRD §6.2). */
 export async function requireUser() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   return session;
 }
 
-/** Server-side gate for /admin/** (Phase 6). */
+/**
+ * Server-side gate for /admin/** (Phase 6).
+ *
+ * Call this in EVERY admin page and admin data function, not only in the
+ * admin layout: layouts are skipped on client-side navigation, so a check
+ * that lives only there does not protect the pages beneath it.
+ */
 export async function requireManager() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   if (session.user.role !== "manager") redirect("/account");
   return session;
