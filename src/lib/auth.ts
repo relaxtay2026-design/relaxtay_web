@@ -40,7 +40,8 @@ const providers = [
       });
       const hash = user?.accounts[0]?.passwordHash;
       if (!user || !hash) return null;
-      if (user.accountStatus === "disabled") return null;
+      // Only an account whose email has been confirmed can use a password
+      if (user.accountStatus !== "active") return null;
       if (!(await verifyPassword(password, hash))) return null;
       return { id: user.id, name: user.name, email: user.email };
     },

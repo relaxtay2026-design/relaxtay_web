@@ -45,6 +45,11 @@ export async function googleAction(): Promise<void> {
   await signIn("google", { redirectTo: "/account" });
 }
 
+/**
+ * Sign-up: no password here. We email a link and the password is chosen
+ * behind it, so an account only ever belongs to whoever holds the inbox.
+ * The response is the same whether or not the address is already known.
+ */
 export async function registerAction(
   _prev: AuthFormState,
   formData: FormData
@@ -52,31 +57,15 @@ export async function registerAction(
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
-    password: formData.get("password"),
   });
   if (!parsed.success)
     return { error: parsed.error.issues[0].message };
-  if (formData.get("password") !== formData.get("confirmPassword"))
-    return { error: "Passwords don't match." };
 
   if (!(await withinLimit("register-ip", await clientIp(), AUTH_LIMITS.registerPerIp)))
     return { error: TOO_MANY };
 
-  const result = await registerUser(parsed.data);
-  if (!result.ok) return { error: result.error };
-
-  // Auto sign-in after registration
-  try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo: "/account",
-    });
-    return { error: null };
-  } catch (e) {
-    if (e instanceof AuthError) redirect("/login");
-    throw e;
-  }
+  await registerUser(parsed.data);
+  return { error: null, done: true };
 }
 
 export async function forgotAction(

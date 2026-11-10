@@ -5,81 +5,96 @@ import { AUTH_LIMITS, withinLimit } from "@/lib/rate-limit";
 import { hashPassword, PASSWORD_MIN } from "./passwords";
 import { createToken, consumeToken, peekToken } from "./tokens";
 import {
+  AccountExistsEmail,
   AccountInvitationEmail,
   PasswordResetEmail,
 } from "@/components/email/account-emails";
+import { brand } from "@/lib/brand";
 
 const site = () => process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const registerSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(254),
-  password: z.string().min(PASSWORD_MIN).max(200),
 });
 
 export type AuthResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Email/password registration (PRD §24). An existing email is NEVER
- * silently taken over — unclaimed profiles (created by bookings) must go
- * through an email-verified path: the claim link or a password reset.
+ * Sign-up (PRD §24). An email address is never trusted until its owner has
+ * opened a link we sent there, so sign-up does NOT take a password:
+ *
+ *  - new email      → an unclaimed profile + an emailed link; the password
+ *                     is chosen on the page behind that link
+ *  - unclaimed      → (profile made by a booking or an earlier sign-up)
+ *                     the link is sent again
+ *  - active account → a short "you already have an account" email
+ *
+ * Whoever is typing learns nothing about which case applied — the caller
+ * shows the same "check your inbox" message for all three. This is what
+ * stops someone registering another person's address and waiting for them
+ * to book or sign in with Google.
  */
 export async function registerUser(
   input: z.infer<typeof registerSchema>
-): Promise<AuthResult> {
+): Promise<void> {
   const email = input.email.toLowerCase();
-  const existing = await db.user.findUnique({
-    where: { email },
-    include: { accounts: true },
-  });
+  const existing = await db.user.findUnique({ where: { email } });
 
-  if (existing) {
-    if (existing.accountStatus === "unclaimed") {
-      // Re-send the claim invitation instead of allowing takeover
-      await sendClaimInvitation(email, existing.name);
-      return {
-        ok: false,
-        error:
-          "A guest profile with this email already exists from a booking. We've re-sent your claim link — check your inbox.",
-      };
-    }
-    return {
-      ok: false,
-      error: "An account with this email already exists. Try signing in.",
-    };
+  if (existing?.accountStatus === "disabled") return;
+  if (existing?.accountStatus === "active") {
+    await sendAccountExists(email, existing.name);
+    return;
   }
-
-  await db.user.create({
-    data: {
-      name: input.name,
-      email,
-      accountStatus: "active",
-      accounts: {
-        create: {
-          type: "credentials",
-          provider: "credentials",
-          providerAccountId: email,
-          passwordHash: await hashPassword(input.password),
-        },
-      },
-    },
-  });
-  return { ok: true };
+  if (!existing) {
+    await db.user.create({
+      data: { name: input.name, email, accountStatus: "unclaimed" },
+    });
+  }
+  await sendClaimInvitation(email, existing?.name ?? input.name, "signup");
 }
 
-/** Send (or re-send) the account-claim invitation (PRD §25). */
-export async function sendClaimInvitation(email: string, guestName: string) {
-  // Cap how often one inbox can be sent this (register re-sends it on demand)
+/**
+ * Send (or re-send) the link that lets the inbox owner set a password and
+ * activate the account (PRD §25). `reason` only changes the wording.
+ */
+export async function sendClaimInvitation(
+  email: string,
+  guestName: string,
+  reason: "booking" | "signup" = "booking"
+) {
+  // Cap how often one inbox can be sent this (sign-up re-sends it on demand)
   if (!(await withinLimit("claim-email", email, AUTH_LIMITS.emailPerAddress)))
     return;
   const raw = await createToken(email, "claim");
   await sendEmail({
     to: email,
-    subject: "Your booking is ready to manage online",
+    subject:
+      reason === "signup"
+        ? `Finish creating your ${brand.name} account`
+        : "Your booking is ready to manage online",
     react: (
       <AccountInvitationEmail
         guestName={guestName}
         claimUrl={`${site()}/claim/${raw}`}
+        reason={reason}
+      />
+    ),
+  });
+}
+
+/** Someone tried to sign up with an address that already has an account. */
+async function sendAccountExists(email: string, name: string) {
+  if (!(await withinLimit("claim-email", email, AUTH_LIMITS.emailPerAddress)))
+    return;
+  await sendEmail({
+    to: email,
+    subject: `You already have a ${brand.name} account`,
+    react: (
+      <AccountExistsEmail
+        name={name}
+        loginUrl={`${site()}/login`}
+        resetUrl={`${site()}/forgot-password`}
       />
     ),
   });
