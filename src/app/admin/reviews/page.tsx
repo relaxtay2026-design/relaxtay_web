@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import { Eye, EyeOff, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +18,7 @@ import {
 export const metadata: Metadata = { title: "Admin — Reviews" };
 
 export default async function AdminReviewsPage() {
+  await requireManager();
   const [reviews, properties] = await Promise.all([
     listAdminReviews(),
     listAdminProperties(),
