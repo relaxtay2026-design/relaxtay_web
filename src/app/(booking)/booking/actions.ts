@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createBooking, createBookingSchema } from "@/server/booking/create";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { BOOKINGS_PER_IP_PER_HOUR } from "@/lib/booking-limits";
 
 export type BookingFormState = { error: string | null };
 
@@ -24,6 +26,22 @@ export async function submitBooking(
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { error: humanize(first.path[0]?.toString(), first.message) };
+  }
+
+  // Per-visitor cap (the per-email cap lives in createBooking)
+  const ip = await clientIp();
+  if (ip) {
+    const limit = await rateLimit({
+      action: "booking",
+      subject: ip,
+      limit: BOOKINGS_PER_IP_PER_HOUR,
+      windowSeconds: 3600,
+    });
+    if (!limit.ok)
+      return {
+        error:
+          "You've sent several requests in a short time. Please wait a little and try again, or contact us directly.",
+      };
   }
 
   const result = await createBooking(parsed.data);

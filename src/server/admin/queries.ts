@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { todayUTC } from "@/lib/dates";
-import { sweepCompleted } from "@/server/booking/transitions";
+import {
+  expireStalePending,
+  sweepCompleted,
+} from "@/server/booking/transitions";
 import type { BookingStatus, Prisma } from "@prisma/client";
 
 /**
@@ -14,6 +17,7 @@ import type { BookingStatus, Prisma } from "@prisma/client";
 export async function getDashboardStats() {
   await requireManager();
   await sweepCompleted();
+  await expireStalePending();
   const today = todayUTC();
   const [activeProperties, upcoming, pending] = await Promise.all([
     db.property.count({ where: { status: "active" } }),
@@ -43,6 +47,7 @@ export async function listAdminBookings(
 ) {
   await requireManager();
   await sweepCompleted();
+  await expireStalePending();
   const today = todayUTC();
   const where: Prisma.BookingWhereInput = {
     ...(propertyId ? { propertyId } : {}),

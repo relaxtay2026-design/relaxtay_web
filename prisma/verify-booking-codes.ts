@@ -1,7 +1,7 @@
 /**
  * Proof for booking reference allocation: many bookings in a row and many
  * at the same moment must all succeed with unique references.
- * 1. 150 sequential requests on non-overlapping dates → 150 bookings.
+ * 1. 100 sequential requests on non-overlapping dates → 100 bookings.
  * 2. 25 simultaneous requests on non-overlapping dates → 25 bookings.
  * 3. Every reference is unique and matches PREFIX-NNNNNN.
  * Cleans up after itself. Run: npx tsx prisma/verify-booking-codes.ts
@@ -10,20 +10,27 @@ import "dotenv/config";
 import { createBooking } from "../src/server/booking/create";
 import { db } from "../src/lib/db";
 import { brand } from "../src/lib/brand";
-import { addDays, toDateOnlyString } from "../src/lib/dates";
+import { addDays, todayUTC, toDateOnlyString } from "../src/lib/dates";
+import { MAX_ADVANCE_DAYS } from "../src/lib/booking-limits";
 
 const EMAIL_DOMAIN = "@codes-test.example.com";
 
 async function main() {
+  const SEQ = 100;
+  const PAR = 25;
+
+  // Back-to-back stays on the shortest-stay property, starting well after
+  // the seed data and ending inside the booking horizon.
   const property = await db.property.findFirst({
     where: { status: "active" },
-    orderBy: { createdAt: "asc" },
+    orderBy: { minNights: "asc" },
   });
   if (!property) throw new Error("No active property — run the seed first.");
-
-  // Far-future, back-to-back stays so nothing overlaps real data.
-  const start = new Date(Date.UTC(2040, 0, 1));
   const stay = Math.max(property.minNights, 1);
+  const START_OFFSET = 90;
+  if (START_OFFSET + (SEQ + PAR) * stay > MAX_ADVANCE_DAYS)
+    throw new Error("Not enough room in the booking horizon for this test.");
+  const start = addDays(todayUTC(), START_OFFSET);
   const request = (i: number) =>
     createBooking({
       slug: property.slug,
@@ -44,12 +51,10 @@ async function main() {
   };
 
   try {
-    const SEQ = 150;
     let seqOk = 0;
     for (let i = 0; i < SEQ; i++) if ((await request(i)).ok) seqOk++;
     report(seqOk === SEQ, `Test 1: ${seqOk}/${SEQ} sequential bookings created`);
 
-    const PAR = 25;
     const par = await Promise.all(
       Array.from({ length: PAR }, (_, k) => request(SEQ + k))
     );

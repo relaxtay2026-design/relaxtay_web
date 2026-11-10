@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { todayUTC } from "@/lib/dates";
+import { PENDING_EXPIRY_HOURS } from "@/lib/booking-limits";
 import {
   BookingConfirmedEmail,
   BookingDeclinedEmail,
@@ -88,4 +89,35 @@ export async function sweepCompleted(): Promise<void> {
     where: { status: "confirmed", checkOut: { lt: todayUTC() } },
     data: { status: "completed" },
   });
+}
+
+/** Shown to the manager as the status note and to the guest in the email. */
+export const EXPIRED_NOTE = `the request expired after ${PENDING_EXPIRY_HOURS} hours without a confirmation`;
+
+/**
+ * Lazy sweep: a pending request nobody answered within PENDING_EXPIRY_HOURS
+ * is declined, the guest is emailed, and its dates open up again. Without
+ * this a request holds the calendar forever. Called wherever availability
+ * is read or written — cheap (indexed) and idempotent.
+ */
+export async function expireStalePending(): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - PENDING_EXPIRY_HOURS * 3_600_000);
+    const stale = await db.booking.findMany({
+      where: { status: "pending", createdAt: { lt: cutoff } },
+      select: { id: true },
+      take: 50,
+    });
+    for (const { id } of stale) {
+      try {
+        await transitionBooking(id, "decline", EXPIRED_NOTE);
+      } catch (e) {
+        // Lost a race with the manager or another sweep — already handled.
+        console.warn(`[booking] expiry of ${id} skipped:`, e);
+      }
+    }
+  } catch (e) {
+    // Housekeeping must never break the request that triggered it.
+    console.error("[booking] expiry sweep failed:", e);
+  }
 }

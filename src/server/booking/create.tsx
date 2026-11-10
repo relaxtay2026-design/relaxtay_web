@@ -4,13 +4,19 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { brand } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
-import { parseDateOnly, todayUTC } from "@/lib/dates";
+import { addDays, parseDateOnly, todayUTC } from "@/lib/dates";
+import {
+  MAX_ADVANCE_DAYS,
+  MAX_NIGHTS,
+  MAX_PENDING_PER_EMAIL,
+} from "@/lib/booking-limits";
 import { quote } from "./quote";
 import {
   BookingRequestGuestEmail,
   BookingRequestManagerEmail,
 } from "@/components/email/booking-request";
 import { sendClaimInvitation } from "@/server/auth/account";
+import { expireStalePending } from "./transitions";
 
 /** Input schema — shared by the server action (PRD §5.2). */
 export const createBookingSchema = z.object({
@@ -51,6 +57,11 @@ export async function createBooking(
     return { ok: false, error: "Check-in cannot be in the past." };
   if (checkOut <= checkIn)
     return { ok: false, error: "Check-out must be after check-in." };
+  if (checkOut > addDays(todayUTC(), MAX_ADVANCE_DAYS))
+    return {
+      ok: false,
+      error: "Those dates are too far ahead. Please choose an earlier stay.",
+    };
 
   const property = await db.property.findUnique({
     where: { slug: input.slug },
@@ -59,6 +70,11 @@ export async function createBooking(
     return { ok: false, error: "This property is not available for booking." };
 
   const q = quote(property, checkIn, checkOut);
+  if (q.nights > MAX_NIGHTS)
+    return {
+      ok: false,
+      error: `Stays are limited to ${MAX_NIGHTS} nights per request. For a longer stay, please contact us.`,
+    };
   if (q.nights < property.minNights)
     return {
       ok: false,
@@ -71,6 +87,18 @@ export async function createBooking(
     };
 
   const email = input.guestEmail.toLowerCase();
+
+  // Free the dates of requests nobody answered in time before judging
+  // availability, then cap how many open requests one email may hold.
+  await expireStalePending();
+  const openRequests = await db.booking.count({
+    where: { guestEmail: email, status: "pending" },
+  });
+  if (openRequests >= MAX_PENDING_PER_EMAIL)
+    return {
+      ok: false,
+      error: `You already have ${openRequests} requests waiting for our reply. We'll answer those first — you can send another once one is confirmed or declined.`,
+    };
 
   try {
     const book = () => db.$transaction(async (tx) => {

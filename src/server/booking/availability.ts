@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
 import { addDays, eachNight, todayUTC } from "@/lib/dates";
+import { MAX_ADVANCE_DAYS } from "@/lib/booking-limits";
+import { expireStalePending } from "./transitions";
 
 /**
  * A property's unavailable nights = union of
@@ -10,8 +12,9 @@ import { addDays, eachNight, todayUTC } from "@/lib/dates";
  */
 export async function getUnavailableDates(
   propertyId: string,
-  horizonDays = 550
+  horizonDays = MAX_ADVANCE_DAYS
 ): Promise<string[]> {
+  await expireStalePending();
   const from = todayUTC();
   const to = addDays(from, horizonDays);
 
@@ -47,6 +50,7 @@ export async function isRangeAvailable(
   checkIn: Date,
   checkOut: Date
 ): Promise<boolean> {
+  await expireStalePending();
   const [booking, block] = await Promise.all([
     db.booking.findFirst({
       where: {

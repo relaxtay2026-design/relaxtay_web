@@ -217,6 +217,18 @@ model AvailabilityBlock {
   @@index([propertyId, startDate, endDate])
 }
 
+// ─── Abuse protection ────────────────────────────────────────────────────
+
+// Fixed-window counters for src/lib/rate-limit.ts. `key` is
+// "<action>:<sha256 of ip-or-email>" — no raw IPs or emails are stored.
+model RateLimit {
+  key         String   @id
+  count       Int      @default(1)
+  windowStart DateTime @default(now())
+
+  @@index([windowStart])
+}
+
 // ─── Reviews (manager-curated in V1, PRD §46) ────────────────────────────
 
 model Review {
