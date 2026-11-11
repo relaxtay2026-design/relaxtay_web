@@ -124,6 +124,9 @@ export async function completeClaim(
 
   const user = await db.user.findUnique({ where: { email } });
   if (!user) return { ok: false, error: "Account not found." };
+  // A link sent before the account was disabled must not switch it back on
+  if (user.accountStatus === "disabled")
+    return { ok: false, error: "This account is not available." };
 
   await db.$transaction([
     db.account.upsert({
@@ -189,6 +192,9 @@ export async function completePasswordReset(
     };
   const user = await db.user.findUnique({ where: { email } });
   if (!user) return { ok: false, error: "Account not found." };
+  // A link sent before the account was disabled must not switch it back on
+  if (user.accountStatus === "disabled")
+    return { ok: false, error: "This account is not available." };
 
   await db.$transaction([
     db.account.upsert({

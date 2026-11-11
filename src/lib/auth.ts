@@ -5,7 +5,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { verifyPassword } from "@/server/auth/passwords";
+import { passwordStamp, verifyPassword } from "@/server/auth/passwords";
 import { AUTH_LIMITS, ipFromHeaders, withinLimit } from "@/lib/rate-limit";
 
 /** Thrown from authorize() when sign-in attempts are being throttled. */
@@ -15,7 +15,8 @@ export class TooManyAttempts extends CredentialsSignin {
 
 /**
  * Auth.js v5 (PRD §6.2): Google + credentials against the same User,
- * JWT sessions carrying role/accountStatus. Google is included only when
+ * JWT sessions carrying role/accountStatus, re-checked against the database
+ * on every read (see the jwt callback). Google is included only when
  * configured, so the app runs before OAuth is set up.
  */
 const providers = [
@@ -79,17 +80,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
+    /**
+     * Runs on every session read, so this is where a session is ended early.
+     * Returning null clears the cookie: the account was deleted or disabled,
+     * or its password changed since this session started (a reset signs
+     * every device out, including whoever prompted the reset).
+     */
     async jwt({ token, user }) {
       if (user?.id) token.userId = user.id;
-      if (token.userId) {
-        const dbUser = await db.user.findUnique({
-          where: { id: token.userId as string },
-          select: { role: true, accountStatus: true, name: true },
-        });
-        token.role = dbUser?.role ?? "guest";
-        token.accountStatus = dbUser?.accountStatus ?? "unclaimed";
-        token.name = dbUser?.name ?? token.name;
-      }
+      if (!token.userId) return token;
+
+      const dbUser = await db.user.findUnique({
+        where: { id: token.userId },
+        select: {
+          role: true,
+          accountStatus: true,
+          name: true,
+          accounts: {
+            where: { provider: "credentials" },
+            select: { passwordHash: true },
+          },
+        },
+      });
+      if (!dbUser || dbUser.accountStatus === "disabled") return null;
+
+      const stamp = passwordStamp(dbUser.accounts[0]?.passwordHash);
+      // A fresh sign-in takes the current stamp; after that it must match.
+      // Sessions from before stamps existed carry none and end here too,
+      // deliberately: letting them through would leave them immune to a
+      // later reset.
+      if (user?.id) token.pwd = stamp;
+      else if (token.pwd !== stamp) return null;
+
+      token.role = dbUser.role;
+      token.accountStatus = dbUser.accountStatus;
+      token.name = dbUser.name ?? token.name;
       return token;
     },
     async session({ session, token }) {

@@ -14,5 +14,7 @@ declare module "next-auth/jwt" {
     userId?: string;
     role?: "guest" | "manager";
     accountStatus?: string;
+    /** Stamp of the password this session was started under. */
+    pwd?: string;
   }
 }

@@ -10,7 +10,7 @@ import {
   completePasswordReset,
 } from "../src/server/auth/account";
 import { createToken } from "../src/server/auth/tokens";
-import { verifyPassword } from "../src/server/auth/passwords";
+import { passwordStamp, verifyPassword } from "../src/server/auth/passwords";
 
 const EMAILS = ["auth-t1@example.com", "auth-t2@example.com"];
 
@@ -126,6 +126,9 @@ async function main() {
   check(!r5.ok, "Test 5: claim token cannot be reused");
 
   // 6. Password reset replaces the password
+  const before6 = await db.account.findFirst({
+    where: { provider: "credentials", providerAccountId: EMAILS[0] },
+  });
   const resetRaw = await createToken(EMAILS[0], "reset");
   const r6 = await completePasswordReset(resetRaw, "new-password-9");
   const u6 = await db.user.findUnique({
@@ -137,6 +140,36 @@ async function main() {
       (await verifyPassword("new-password-9", u6!.accounts[0].passwordHash!)) &&
       !(await verifyPassword("test-password-1", u6!.accounts[0].passwordHash!)),
     "Test 6: password reset replaces old password"
+  );
+
+  // 7. …and changes the stamp that sessions are checked against, so every
+  //    session started under the old password ends (see jwt() in lib/auth)
+  check(
+    passwordStamp(before6?.passwordHash) !==
+      passwordStamp(u6!.accounts[0].passwordHash) &&
+      passwordStamp(null) === "none",
+    "Test 7: a reset changes the session stamp (old sessions end)"
+  );
+
+  // 8. A link sent before an account was disabled can't switch it back on
+  const lateReset = await createToken(EMAILS[0], "reset");
+  const lateClaim = await createToken(EMAILS[0], "claim");
+  await db.user.update({
+    where: { email: EMAILS[0] },
+    data: { accountStatus: "disabled" },
+  });
+  const r8a = await completePasswordReset(lateReset, "sneak-back-in-1");
+  const r8b = await completeClaim(lateClaim, "sneak-back-in-2");
+  const u8 = await db.user.findUnique({
+    where: { email: EMAILS[0] },
+    include: { accounts: true },
+  });
+  check(
+    !r8a.ok &&
+      !r8b.ok &&
+      u8?.accountStatus === "disabled" &&
+      (await verifyPassword("new-password-9", u8.accounts[0].passwordHash!)),
+    "Test 8: reset and claim links don't re-enable a disabled account"
   );
 
   await cleanup();
