@@ -122,3 +122,33 @@ export function PasswordResetEmail({ resetUrl }: { resetUrl: string }) {
     </EmailShell>
   );
 }
+
+/** Signed-in password change: confirm by opening the link. */
+export function PasswordChangeEmail({
+  url,
+  hasPassword,
+}: {
+  url: string;
+  hasPassword: boolean;
+}) {
+  const what = hasPassword ? "change the password" : "set a password";
+  return (
+    <EmailShell
+      preview={hasPassword ? "Confirm your password change." : "Set a password."}
+      heading={hasPassword ? "Confirm your password change" : "Set a password"}
+    >
+      <Text style={bodyText}>
+        You asked to {what} for your {brand.name} account. To confirm it was
+        you, open the link below and choose your new password. The link is
+        valid for one hour and can be used once.
+      </Text>
+      <Button href={url} style={{ ...cta, marginTop: "16px" }}>
+        Choose a new password
+      </Button>
+      <Text style={{ ...mutedText, marginTop: "24px" }}>
+        Saving the new password signs you out on every device. If you
+        didn&apos;t ask for this, ignore this email — nothing has changed.
+      </Text>
+    </EmailShell>
+  );
+}

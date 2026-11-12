@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Divider } from "@/components/ui/card";
 import { ProfileForm } from "./profile-form";
+import { PasswordChange } from "./password-change";
 
 export const metadata: Metadata = { title: "Profile" };
 
@@ -29,6 +29,18 @@ export default async function ProfilePage() {
       <Divider className="my-10 max-w-md" />
 
       <section>
+        <h2 className="type-headline-md mb-4">
+          {providers.includes("credentials") ? "Password" : "Set a password"}
+        </h2>
+        <PasswordChange
+          email={user.email}
+          hasPassword={providers.includes("credentials")}
+        />
+      </section>
+
+      <Divider className="my-10 max-w-md" />
+
+      <section>
         <h2 className="type-headline-md mb-4">Sign-in methods</h2>
         <ul className="type-body-md space-y-2 text-muted">
           <li>
@@ -36,12 +48,7 @@ export default async function ProfilePage() {
             {providers.includes("credentials") ? (
               <span className="text-ink">connected</span>
             ) : (
-              <Link
-                href="/forgot-password"
-                className="underline underline-offset-4"
-              >
-                set a password
-              </Link>
+              <span>not set</span>
             )}
           </li>
           <li>

@@ -10,6 +10,7 @@ import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { WelcomeNote } from "./welcome-note";
 
 export const metadata: Metadata = { title: "Your stays" };
 
@@ -20,8 +21,11 @@ function greeting(): string {
   return "Good evening";
 }
 
-export default async function AccountOverviewPage() {
+export default async function AccountOverviewPage({
+  searchParams,
+}: PageProps<"/account">) {
   const session = await requireUser();
+  const welcome = (await searchParams).welcome === "1";
   const next = await nextUpcomingBooking(
     session.user.id,
     session.user.email ?? ""
@@ -30,6 +34,7 @@ export default async function AccountOverviewPage() {
 
   return (
     <main>
+      {welcome && <WelcomeNote />}
       <h1 className="type-display-md">
         {greeting()}, {firstName}.
       </h1>

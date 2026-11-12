@@ -8,11 +8,40 @@ import { sendEmail } from "@/lib/email";
 import { brand } from "@/lib/brand";
 import { todayUTC } from "@/lib/dates";
 import { CancellationRequestEmail } from "@/components/email/cancellation-request";
+import { requestPasswordChange } from "@/server/auth/account";
 
 export type AccountFormState = { error: string | null; saved?: boolean };
 
 export async function signOutAction(): Promise<void> {
   await signOut({ redirectTo: "/" });
+}
+
+export type PasswordChangeState = {
+  error: string | null;
+  sentTo?: string;
+};
+
+/** Profile → Change password: email a confirmation link to the account. */
+export async function requestPasswordChangeAction(): Promise<PasswordChangeState> {
+  const session = await requireUser();
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      email: true,
+      accounts: { where: { provider: "credentials" }, select: { id: true } },
+    },
+  });
+  if (!user) return { error: "Account not found." };
+  const result = await requestPasswordChange(
+    user.email,
+    user.accounts.length > 0
+  );
+  if (result === "rate_limited")
+    return {
+      error:
+        "We've already sent several links in the last hour. Use the most recent one, or try again later.",
+    };
+  return { error: null, sentTo: user.email };
 }
 
 const profileSchema = z.object({
