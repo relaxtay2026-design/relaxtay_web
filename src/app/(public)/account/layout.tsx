@@ -1,5 +1,6 @@
 import { LogOut } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { countGuestUpdates } from "@/server/account/queries";
 import { AccountSidebar } from "./sidebar";
 import { signOutAction } from "./actions";
 
@@ -9,11 +10,16 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireUser();
+  const session = await requireUser();
+  const updates = await countGuestUpdates(
+    session.user.id,
+    session.user.email ?? ""
+  );
   return (
     <div className="container-page grid gap-12 py-14 lg:grid-cols-[220px_1fr]">
       <aside className="hidden lg:block">
         <AccountSidebar
+          updates={updates}
           signOutSlot={
             <form action={signOutAction}>
               <button

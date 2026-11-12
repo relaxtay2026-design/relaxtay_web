@@ -12,6 +12,7 @@ import { formatDateRange, todayUTC } from "@/lib/dates";
 import { Card, CardSection, Divider } from "@/components/ui/card";
 import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { CancelRequestButton } from "./cancel-button";
+import { MarkSeen } from "../../mark-seen";
 
 export const metadata: Metadata = { title: "Booking details" };
 
@@ -30,6 +31,7 @@ export default async function BookingDetailPage({
 
   return (
     <main>
+      {b.guestUpdateAt && <MarkSeen ids={[b.id]} />}
       <Link
         href="/account/bookings"
         className="type-label flex items-center gap-2 text-muted hover:text-ink"

@@ -190,6 +190,9 @@ model Booking {
   status                  BookingStatus @default(pending)
   statusNote              String? // manager-facing note on decline/cancel
   cancellationRequestedAt DateTime? // guest requested; manager executes (D7)
+  /// When the status last changed by the manager or by expiry, until the
+  /// guest has seen it — drives the guest's red "updates" count.
+  guestUpdateAt           DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

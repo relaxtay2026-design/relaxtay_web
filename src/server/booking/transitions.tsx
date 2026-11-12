@@ -47,7 +47,12 @@ export async function transitionBooking(
 
   const updated = await db.booking.update({
     where: { id: booking.id, status: booking.status }, // optimistic guard
-    data: { status: TARGET[action], statusNote: note?.trim() || null },
+    data: {
+      status: TARGET[action],
+      statusNote: note?.trim() || null,
+      // Shows on the guest's side as an update until they have seen it
+      guestUpdateAt: new Date(),
+    },
   });
 
   const b = {
