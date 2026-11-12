@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import {
   listAdminBookings,
@@ -28,6 +29,7 @@ const TABS: AdminBookingTab[] = [
 export default async function AdminBookingsPage({
   searchParams,
 }: PageProps<"/admin/bookings">) {
+  await requireManager();
   const sp = await searchParams;
   const tab = (
     TABS.includes(sp.tab as AdminBookingTab) ? sp.tab : "all"

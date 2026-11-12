@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { db } from "@/lib/db";
 import { Card, CardSection } from "@/components/ui/card";
@@ -30,6 +31,7 @@ function EnvRow({
 }
 
 export default async function AdminSettingsPage() {
+  await requireManager();
   const amenities = await db.amenity.findMany({
     include: { _count: { select: { properties: true } } },
     orderBy: { sortOrder: "asc" },

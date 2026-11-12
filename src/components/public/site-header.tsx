@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/public/profile-menu";
@@ -11,9 +10,15 @@ const nav = [
   { href: "/about#contact", label: "Contact" },
 ];
 
-/** Minimal editorial top bar: wordmark, tracked links, one loud CTA. */
-export async function SiteHeader() {
-  const session = await auth();
+/**
+ * Minimal editorial top bar: wordmark, tracked links, one loud CTA.
+ *
+ * Deliberately reads NO session here. Reading cookies in this shared header
+ * would make every public page render on demand for every visitor; the
+ * signed-in state is filled in by ProfileMenu in the browser instead, so
+ * the pages themselves can be prerendered and cached.
+ */
+export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border-ghost bg-ivory/95 backdrop-blur-sm">
       <div className="container-page flex h-20 items-center justify-between gap-8">
@@ -43,12 +48,7 @@ export async function SiteHeader() {
           >
             Book a stay
           </Link>
-          <ProfileMenu
-            signedIn={Boolean(session?.user?.id)}
-            name={session?.user?.name ?? ""}
-            email={session?.user?.email ?? ""}
-            isManager={session?.user?.role === "manager"}
-          />
+          <ProfileMenu />
         </div>
       </div>
     </header>

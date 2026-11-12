@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireManager } from "@/lib/auth";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { listAmenities } from "@/server/admin/queries";
@@ -7,6 +8,7 @@ import { PropertyForm } from "../property-form";
 export const metadata: Metadata = { title: "Admin — Add property" };
 
 export default async function NewPropertyPage() {
+  await requireManager();
   const amenities = await listAmenities();
 
   return (

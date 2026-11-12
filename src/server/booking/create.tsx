@@ -1,14 +1,22 @@
+import { randomInt } from "crypto";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { brand } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
-import { parseDateOnly, todayUTC } from "@/lib/dates";
+import { addDays, parseDateOnly, todayUTC } from "@/lib/dates";
+import {
+  MAX_ADVANCE_DAYS,
+  MAX_NIGHTS,
+  MAX_PENDING_PER_EMAIL,
+} from "@/lib/booking-limits";
 import { quote } from "./quote";
 import {
   BookingRequestGuestEmail,
   BookingRequestManagerEmail,
 } from "@/components/email/booking-request";
 import { sendClaimInvitation } from "@/server/auth/account";
+import { expireStalePending } from "./transitions";
 
 /** Input schema — shared by the server action (PRD §5.2). */
 export const createBookingSchema = z.object({
@@ -49,6 +57,11 @@ export async function createBooking(
     return { ok: false, error: "Check-in cannot be in the past." };
   if (checkOut <= checkIn)
     return { ok: false, error: "Check-out must be after check-in." };
+  if (checkOut > addDays(todayUTC(), MAX_ADVANCE_DAYS))
+    return {
+      ok: false,
+      error: "Those dates are too far ahead. Please choose an earlier stay.",
+    };
 
   const property = await db.property.findUnique({
     where: { slug: input.slug },
@@ -57,6 +70,11 @@ export async function createBooking(
     return { ok: false, error: "This property is not available for booking." };
 
   const q = quote(property, checkIn, checkOut);
+  if (q.nights > MAX_NIGHTS)
+    return {
+      ok: false,
+      error: `Stays are limited to ${MAX_NIGHTS} nights per request. For a longer stay, please contact us.`,
+    };
   if (q.nights < property.minNights)
     return {
       ok: false,
@@ -70,8 +88,20 @@ export async function createBooking(
 
   const email = input.guestEmail.toLowerCase();
 
+  // Free the dates of requests nobody answered in time before judging
+  // availability, then cap how many open requests one email may hold.
+  await expireStalePending();
+  const openRequests = await db.booking.count({
+    where: { guestEmail: email, status: "pending" },
+  });
+  if (openRequests >= MAX_PENDING_PER_EMAIL)
+    return {
+      ok: false,
+      error: `You already have ${openRequests} requests waiting for our reply. We'll answer those first — you can send another once one is confirmed or declined.`,
+    };
+
   try {
-    const result = await db.$transaction(async (tx) => {
+    const book = () => db.$transaction(async (tx) => {
       // Blocks aren't covered by the exclusion constraint — check here,
       // inside the transaction (manager-only writes; race window ~nil).
       const block = await tx.availabilityBlock.findFirst({
@@ -128,6 +158,7 @@ export async function createBooking(
       });
       return { row, isNewCustomer: !existed };
     });
+    const result = await withUniqueRetry(book);
     const booking = result.row;
 
     // Post-commit notifications — must not fail the booking
@@ -190,11 +221,51 @@ function isOverlapViolation(e: unknown): boolean {
   return msg.includes("booking_no_overlap") || msg.includes("23P01");
 }
 
-/** Sequential-looking human reference: LUM-10482 style, race-safe via retry. */
-async function nextCode(tx: {
-  booking: { count: (args?: object) => Promise<number> };
-}): Promise<string> {
-  const count = await tx.booking.count();
-  const n = 10000 + count + Math.floor(Math.random() * 50);
-  return `${brand.bookingPrefix}-${n}`;
+/**
+ * Human booking reference, e.g. RLX-482915: prefix + 6 random digits.
+ *
+ * Random rather than counted: a reference derived from the booking count
+ * lands in the same narrow range as its neighbours and collides with them.
+ * A taken reference is skipped here; the rare case of two requests picking
+ * the same free reference at the same instant is caught by the unique
+ * index and retried by withUniqueRetry().
+ */
+async function nextCode(tx: Prisma.TransactionClient): Promise<string> {
+  for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
+    const code = `${brand.bookingPrefix}-${randomInt(100_000, 1_000_000)}`;
+    const taken = await tx.booking.findUnique({
+      where: { code },
+      select: { id: true },
+    });
+    if (!taken) return code;
+  }
+  throw new Error("Could not allocate a free booking reference.");
+}
+
+const CODE_ATTEMPTS = 10;
+const TRANSACTION_ATTEMPTS = 3;
+
+/**
+ * Re-run the booking transaction when it loses a race on a unique index
+ * (Prisma P2002): two requests allocating the same reference, or two first
+ * bookings from the same new email. A unique violation aborts the Postgres
+ * transaction, so the retry has to be a fresh transaction.
+ */
+async function withUniqueRetry<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (e) {
+      if (attempt >= TRANSACTION_ATTEMPTS || !isUniqueViolation(e)) throw e;
+    }
+  }
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code: unknown }).code === "P2002"
+  );
 }

@@ -10,7 +10,10 @@ import {
   toDateOnlyString,
   nightsBetween,
   eachNight,
+  addDays,
+  todayUTC,
 } from "@/lib/dates";
+import { MAX_ADVANCE_DAYS, MAX_NIGHTS } from "@/lib/booking-limits";
 import { Card, CardSection, Divider } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -25,6 +28,8 @@ const BOUNCE_ERRORS: Record<string, string> = {
   order: "Check-out must be after check-in.",
   min: "Those dates are under this property's minimum stay.",
   dates: "Please select your dates to continue.",
+  max: `Stays are limited to ${MAX_NIGHTS} nights per request — for longer, please contact us.`,
+  far: "Those dates are too far ahead — please pick an earlier stay.",
 };
 
 /**
@@ -91,12 +96,18 @@ export function BookingCard({
     }
   }, [loadAvailability]);
 
+  /** Latest check-out the server accepts (MAX_ADVANCE_DAYS from today). */
+  const lastBookableDay = React.useMemo(
+    () => addDays(todayUTC(), MAX_ADVANCE_DAYS),
+    []
+  );
+
   const disabled = React.useMemo(() => {
     const days = (availability?.unavailable ?? [])
       .map(parseDateOnly)
       .filter((d): d is Date => d !== null);
-    return [{ before: new Date() }, ...days];
-  }, [availability]);
+    return [{ before: new Date() }, { after: lastBookableDay }, ...days];
+  }, [availability, lastBookableDay]);
 
   const nights =
     range?.from && range?.to ? nightsBetween(range.from, range.to) : 0;
@@ -112,6 +123,10 @@ export function BookingCard({
     }
     if (!validStay) {
       setError(`Minimum stay is ${minNights} nights for this property.`);
+      return;
+    }
+    if (nights > MAX_NIGHTS) {
+      setError(BOUNCE_ERRORS.max);
       return;
     }
     setChecking(true);
@@ -190,6 +205,8 @@ export function BookingCard({
               disabled={disabled}
               excludeDisabled
               min={minNights}
+              max={MAX_NIGHTS}
+              endMonth={lastBookableDay}
               numberOfMonths={1}
               className="rdp-lumiere mx-auto"
             />

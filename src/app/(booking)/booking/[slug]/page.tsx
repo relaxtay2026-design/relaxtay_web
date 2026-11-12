@@ -6,7 +6,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { imageUrl } from "@/lib/images";
 import { formatMoney } from "@/lib/money";
-import { parseDateOnly, todayUTC, formatDateRange } from "@/lib/dates";
+import {
+  addDays,
+  parseDateOnly,
+  todayUTC,
+  formatDateRange,
+} from "@/lib/dates";
+import { MAX_ADVANCE_DAYS, MAX_NIGHTS } from "@/lib/booking-limits";
 import { quote } from "@/server/booking/quote";
 import { isRangeAvailable } from "@/server/booking/availability";
 import { Card, CardSection, Divider } from "@/components/ui/card";
@@ -44,6 +50,8 @@ export default async function BookingPage({
   if (!checkIn || !checkOut) bounce("dates");
   if (checkIn! < todayUTC()) bounce("past");
   if (checkOut! <= checkIn!) bounce("order");
+  if (checkOut! > addDays(todayUTC(), MAX_ADVANCE_DAYS)) bounce("far");
+  if (quote(property, checkIn!, checkOut!).nights > MAX_NIGHTS) bounce("max");
   if (quote(property, checkIn!, checkOut!).nights < property.minNights)
     bounce("min");
   if (!(await isRangeAvailable(property.id, checkIn!, checkOut!)))

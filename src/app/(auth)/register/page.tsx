@@ -18,6 +18,7 @@ export default async function RegisterPage() {
       <h1 className="type-headline-lg text-center">Create your account</h1>
       <p className="type-body-md text-muted mt-3 text-center">
         Keep your stays, booking status, and details in one place.
+        We&apos;ll email you a link to choose your password.
       </p>
 
       <div className="mt-10 space-y-6">
@@ -41,8 +42,24 @@ export default async function RegisterPage() {
 
         <AuthForm
           action={registerAction}
-          submitLabel="Create account"
-          pendingLabel="Creating…"
+          submitLabel="Continue"
+          pendingLabel="Sending…"
+          successContent={
+            <div className="text-center">
+              <p className="type-body-lg">Check your inbox.</p>
+              <p className="type-body-md text-muted mt-3">
+                We&apos;ve emailed you a link to confirm your address and
+                choose a password. It&apos;s valid for 7 days. If you already
+                have an account, the email will point you to sign in.
+              </p>
+              <Link
+                href="/login"
+                className="type-label mt-8 inline-block underline underline-offset-4"
+              >
+                Back to sign in
+              </Link>
+            </div>
+          }
           footer={
             <p className="type-body-md text-muted text-center">
               Already have an account?{" "}
@@ -65,26 +82,6 @@ export default async function RegisterPage() {
               type="email"
               required
               autoComplete="email"
-            />
-          </Field>
-          <Field label="Password" htmlFor="password">
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-            />
-          </Field>
-          <Field label="Confirm password" htmlFor="confirmPassword">
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              required
-              autoComplete="new-password"
             />
           </Field>
         </AuthForm>
