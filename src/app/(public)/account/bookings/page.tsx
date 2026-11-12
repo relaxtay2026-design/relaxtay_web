@@ -20,10 +20,7 @@ export default async function MyStaysPage({
   const sp = await searchParams;
   const tab = sp.tab === "past" ? "past" : "upcoming";
 
-  const all = await listUserBookings(
-    session.user.id,
-    session.user.email ?? ""
-  );
+  const all = await listUserBookings(session.user.id);
   const today = todayUTC();
   const bookings = all.filter((b) =>
     tab === "upcoming"

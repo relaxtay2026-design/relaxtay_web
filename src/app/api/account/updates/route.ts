@@ -10,7 +10,7 @@ import { countGuestUpdates } from "@/server/account/queries";
 export async function GET() {
   const session = await auth();
   const count = session?.user?.id
-    ? await countGuestUpdates(session.user.id, session.user.email ?? "")
+    ? await countGuestUpdates(session.user.id)
     : 0;
   return NextResponse.json(
     { count },

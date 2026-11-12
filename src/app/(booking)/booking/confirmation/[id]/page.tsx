@@ -46,6 +46,13 @@ export default async function ConfirmationPage({
         where: { email: booking.guestEmail },
         select: { accountStatus: true },
       });
+  // Signed in and booked for someone else: both addresses got the email
+  const mine = !!session?.user?.id && booking.userId === session.user.id;
+  const ownEmail = session?.user?.email?.toLowerCase();
+  const sentTo =
+    mine && ownEmail && ownEmail !== booking.guestEmail
+      ? `${booking.guestEmail} and ${ownEmail}`
+      : booking.guestEmail;
 
   return (
     <main className="container-page flex flex-col items-center py-16">
@@ -59,8 +66,8 @@ export default async function ConfirmationPage({
       </h1>
       <p className="type-body-lg text-muted mt-4 max-w-xl text-center">
         {pending
-          ? `Thank you, ${booking.guestName.split(" ")[0]}. We've emailed a copy to ${booking.guestEmail} and will confirm your stay personally — usually within a day.`
-          : `Your stay is confirmed. A confirmation has been sent to ${booking.guestEmail}.`}
+          ? `Thank you, ${booking.guestName.split(" ")[0]}. We've emailed a copy to ${sentTo} and will confirm your stay personally — usually within a day.`
+          : `Your stay is confirmed. A confirmation has been sent to ${sentTo}.`}
       </p>
 
       <Card className="mt-12 w-full max-w-md">
@@ -137,6 +144,15 @@ export default async function ConfirmationPage({
             )}
           </CardSection>
         </Card>
+      )}
+
+      {mine && (
+        <Link
+          href={`/account/bookings/${booking.id}`}
+          className={cn(buttonVariants({ size: "sm" }), "mt-8")}
+        >
+          See it in My stays
+        </Link>
       )}
 
       <Link
