@@ -31,8 +31,8 @@ export default async function AccountOverviewPage({
   const session = await requireUser();
   const welcome = (await searchParams).welcome === "1";
   const [next, updates] = await Promise.all([
-    nextUpcomingBooking(session.user.id, session.user.email ?? ""),
-    listGuestUpdates(session.user.id, session.user.email ?? ""),
+    nextUpcomingBooking(session.user.id),
+    listGuestUpdates(session.user.id),
   ]);
   const firstName = (session.user.name ?? "there").split(" ")[0];
 

@@ -48,7 +48,13 @@ const DATES_TAKEN =
  * never fail the booking.
  */
 export async function createBooking(
-  input: CreateBookingInput
+  input: CreateBookingInput,
+  /**
+   * The signed-in account making the request, if any. The booking then
+   * belongs to that account even when the form names someone else (a
+   * friend or family member); the guest details stay as typed.
+   */
+  booker?: { id: string; email: string } | null
 ): Promise<CreateBookingResult> {
   const checkIn = parseDateOnly(input.checkIn);
   const checkOut = parseDateOnly(input.checkOut);
@@ -92,13 +98,33 @@ export async function createBooking(
   // availability, then cap how many open requests one email may hold.
   await expireStalePending();
   const openRequests = await db.booking.count({
-    where: { guestEmail: email, status: "pending" },
+    where: {
+      status: "pending",
+      OR: [{ guestEmail: email }, ...(booker ? [{ userId: booker.id }] : [])],
+    },
   });
   if (openRequests >= MAX_PENDING_PER_EMAIL)
     return {
       ok: false,
       error: `You already have ${openRequests} requests waiting for our reply. We'll answer those first — you can send another once one is confirmed or declined.`,
     };
+
+  const bookingData = (userId: string, code: string) => ({
+    code,
+    propertyId: property.id,
+    userId,
+    guestName: input.guestName,
+    guestEmail: email,
+    guestPhone: input.guestPhone,
+    guestCount: input.guestCount,
+    guestMessage: input.guestMessage || null,
+    checkIn,
+    checkOut,
+    nightlyPriceCents: q.nightlyPriceCents,
+    totalCents: q.totalCents,
+    currency: q.currency,
+    status: "pending" as const,
+  });
 
   try {
     const book = () => db.$transaction(async (tx) => {
@@ -113,6 +139,18 @@ export async function createBooking(
         select: { id: true },
       });
       if (block) throw new DatesTakenError();
+
+      if (booker) {
+        if (input.marketingOptIn)
+          await tx.user.update({
+            where: { id: booker.id },
+            data: { marketingOptIn: true, marketingOptInAt: new Date() },
+          });
+        const row = await tx.booking.create({
+          data: bookingData(booker.id, await nextCode(tx)),
+        });
+        return { row, isNewCustomer: false };
+      }
 
       const existed = await tx.user.findUnique({
         where: { email },
@@ -139,22 +177,7 @@ export async function createBooking(
 
       // The exclusion constraint fires on overlap with pending/confirmed
       const row = await tx.booking.create({
-        data: {
-          code: await nextCode(tx),
-          propertyId: property.id,
-          userId: user.id,
-          guestName: input.guestName,
-          guestEmail: email,
-          guestPhone: input.guestPhone,
-          guestCount: input.guestCount,
-          guestMessage: input.guestMessage || null,
-          checkIn,
-          checkOut,
-          nightlyPriceCents: q.nightlyPriceCents,
-          totalCents: q.totalCents,
-          currency: q.currency,
-          status: "pending",
-        },
+        data: bookingData(user.id, await nextCode(tx)),
       });
       return { row, isNewCustomer: !existed };
     });
@@ -178,12 +201,18 @@ export async function createBooking(
       currency: booking.currency,
     };
     const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    // The guest, and the signed-in booker when they booked for someone else
+    const guestRecipients = [
+      ...new Set([booking.guestEmail, booker?.email.toLowerCase()]),
+    ].filter((to): to is string => !!to);
     await Promise.all([
-      sendEmail({
-        to: booking.guestEmail,
-        subject: `Your reservation request — ${property.title}`,
-        react: <BookingRequestGuestEmail b={emailData} />,
-      }),
+      ...guestRecipients.map((to) =>
+        sendEmail({
+          to,
+          subject: `Your reservation request — ${property.title}`,
+          react: <BookingRequestGuestEmail b={emailData} />,
+        })
+      ),
       sendEmail({
         to: process.env.MANAGER_EMAIL ?? brand.email,
         subject: `New booking request: ${property.title} (${booking.code})`,

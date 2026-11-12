@@ -11,10 +11,7 @@ export default async function AccountLayout({
   children: React.ReactNode;
 }) {
   const session = await requireUser();
-  const updates = await countGuestUpdates(
-    session.user.id,
-    session.user.email ?? ""
-  );
+  const updates = await countGuestUpdates(session.user.id);
   return (
     <div className="container-page grid gap-12 py-14 lg:grid-cols-[220px_1fr]">
       <aside className="hidden lg:block">

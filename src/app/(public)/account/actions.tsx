@@ -93,13 +93,8 @@ export async function requestCancellationAction(
 ): Promise<AccountFormState> {
   const session = await requireUser();
   const bookingId = String(formData.get("bookingId") ?? "");
-  const email = session.user.email?.toLowerCase() ?? "";
-
   const booking = await db.booking.findFirst({
-    where: {
-      id: bookingId,
-      OR: [{ userId: session.user.id }, { guestEmail: email }],
-    },
+    where: { id: bookingId, userId: session.user.id },
     include: { property: { select: { title: true } } },
   });
   if (!booking) return { error: "Booking not found." };
@@ -140,5 +135,5 @@ export async function requestCancellationAction(
 export async function markUpdatesSeenAction(bookingIds: string[]): Promise<void> {
   const session = await requireUser();
   const ids = bookingIds.filter((id) => typeof id === "string").slice(0, 50);
-  await markGuestUpdatesSeen(session.user.id, session.user.email ?? "", ids);
+  await markGuestUpdatesSeen(session.user.id, ids);
 }

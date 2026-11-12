@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createBooking, createBookingSchema } from "@/server/booking/create";
+import { auth } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { BOOKINGS_PER_IP_PER_HOUR } from "@/lib/booking-limits";
 
@@ -44,7 +45,14 @@ export async function submitBooking(
       };
   }
 
-  const result = await createBooking(parsed.data);
+  // Signed in: the booking is theirs, even when made for someone else
+  const session = await auth();
+  const booker =
+    session?.user?.id && session.user.email
+      ? { id: session.user.id, email: session.user.email }
+      : null;
+
+  const result = await createBooking(parsed.data, booker);
   if (!result.ok) return { error: result.error };
 
   redirect(`/booking/confirmation/${result.bookingId}`);

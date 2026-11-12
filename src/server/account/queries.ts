@@ -12,20 +12,28 @@ const bookingInclude = {
   },
 };
 
-/** All bookings belonging to a signed-in user (by id OR historical email). */
-export function listUserBookings(userId: string, email: string) {
+/**
+ * A booking belongs to the account that made it: the signed-in booker, or,
+ * for a booking made signed out, the account of the email on the form.
+ * The guest email alone never grants access, so a friend someone booked
+ * for does not see that booking in their own account.
+ */
+const ownedBy = (userId: string) => ({ userId });
+
+/** All bookings belonging to a signed-in user. */
+export function listUserBookings(userId: string) {
   return db.booking.findMany({
-    where: { OR: [{ userId }, { guestEmail: email.toLowerCase() }] },
+    where: ownedBy(userId),
     include: bookingInclude,
     orderBy: { checkIn: "desc" },
   });
 }
 
 /** Next upcoming stay for the dashboard hero (pending or confirmed). */
-export function nextUpcomingBooking(userId: string, email: string) {
+export function nextUpcomingBooking(userId: string) {
   return db.booking.findFirst({
     where: {
-      OR: [{ userId }, { guestEmail: email.toLowerCase() }],
+      ...ownedBy(userId),
       status: { in: ["pending", "confirmed"] },
       checkOut: { gte: todayUTC() },
     },
@@ -35,24 +43,20 @@ export function nextUpcomingBooking(userId: string, email: string) {
 }
 
 /** Single booking, ownership enforced (PRD §11 security). */
-export function getUserBooking(id: string, userId: string, email: string) {
+export function getUserBooking(id: string, userId: string) {
   return db.booking.findFirst({
     where: {
       id,
-      OR: [{ userId }, { guestEmail: email.toLowerCase() }],
+      ...ownedBy(userId),
     },
     include: bookingInclude,
   });
 }
 
-const ownedBy = (userId: string, email: string) => ({
-  OR: [{ userId }, { guestEmail: email.toLowerCase() }],
-});
-
 /** Status changes the guest hasn't seen yet (confirmed, declined, cancelled). */
-export function listGuestUpdates(userId: string, email: string) {
+export function listGuestUpdates(userId: string) {
   return db.booking.findMany({
-    where: { ...ownedBy(userId, email), guestUpdateAt: { not: null } },
+    where: { ...ownedBy(userId), guestUpdateAt: { not: null } },
     select: {
       id: true,
       status: true,
@@ -65,22 +69,21 @@ export function listGuestUpdates(userId: string, email: string) {
   });
 }
 
-export function countGuestUpdates(userId: string, email: string) {
+export function countGuestUpdates(userId: string) {
   return db.booking.count({
-    where: { ...ownedBy(userId, email), guestUpdateAt: { not: null } },
+    where: { ...ownedBy(userId), guestUpdateAt: { not: null } },
   });
 }
 
 /** The guest has now seen these bookings' current status. */
 export function markGuestUpdatesSeen(
   userId: string,
-  email: string,
   bookingIds: string[]
 ) {
   if (bookingIds.length === 0) return Promise.resolve({ count: 0 });
   return db.booking.updateMany({
     where: {
-      ...ownedBy(userId, email),
+      ...ownedBy(userId),
       id: { in: bookingIds },
       guestUpdateAt: { not: null },
     },

@@ -36,7 +36,10 @@ export async function transitionBooking(
 ): Promise<TransitionResult> {
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
-    include: { property: { select: { title: true, location: true } } },
+    include: {
+      property: { select: { title: true, location: true } },
+      user: { select: { email: true } },
+    },
   });
   if (!booking) return { ok: false, error: "Booking not found." };
   if (!ALLOWED[action].includes(booking.status))
@@ -81,7 +84,13 @@ export async function transitionBooking(
         ? `About your request — ${booking.property.title}`
         : `Reservation cancelled — ${updated.code}`;
 
-  await sendEmail({ to: updated.guestEmail, subject, react: email });
+  // The guest, and the account holder when they booked for someone else
+  const recipients = [
+    ...new Set([updated.guestEmail, booking.user?.email?.toLowerCase()]),
+  ].filter((to): to is string => !!to);
+  await Promise.all(
+    recipients.map((to) => sendEmail({ to, subject, react: email }))
+  );
   return { ok: true };
 }
 

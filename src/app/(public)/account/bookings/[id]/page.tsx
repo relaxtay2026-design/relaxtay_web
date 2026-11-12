@@ -21,7 +21,7 @@ export default async function BookingDetailPage({
 }: PageProps<"/account/bookings/[id]">) {
   const session = await requireUser();
   const { id } = await params;
-  const b = await getUserBooking(id, session.user.id, session.user.email ?? "");
+  const b = await getUserBooking(id, session.user.id);
   if (!b) notFound();
 
   const cancellable =
