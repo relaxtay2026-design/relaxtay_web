@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { claimTokenEmail } from "@/server/auth/account";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field } from "@/components/ui/label";
 import { AuthForm } from "../../auth-form";
 import { claimAction } from "../../actions";
@@ -49,10 +49,9 @@ export default async function ClaimPage({
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="email" value={email} />
           <Field label="Password" htmlFor="password">
-            <Input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               minLength={8}
               autoComplete="new-password"
@@ -60,10 +59,9 @@ export default async function ClaimPage({
             />
           </Field>
           <Field label="Confirm password" htmlFor="confirmPassword">
-            <Input
+            <PasswordInput
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
               required
               autoComplete="new-password"
             />

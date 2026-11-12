@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, googleEnabled } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field } from "@/components/ui/label";
 import { AuthForm } from "../auth-form";
 import { loginAction, googleAction } from "../actions";
@@ -84,10 +85,9 @@ export default async function LoginPage({
             />
           </Field>
           <Field label="Password" htmlFor="password">
-            <Input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               autoComplete="current-password"
               placeholder="Your password"

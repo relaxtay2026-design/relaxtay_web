@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, CalendarClock, Home } from "lucide-react";
+import { BellRing, CalendarDays, CalendarClock, Home } from "lucide-react";
 import { requireManager } from "@/lib/auth";
 import {
+  getAttentionCounts,
   getDashboardStats,
   listUpcomingBookings,
 } from "@/server/admin/queries";
 import { formatMoney } from "@/lib/money";
 import { formatDateRange } from "@/lib/dates";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { Table, THead, TH, TBody, TD } from "@/components/ui/table";
@@ -24,9 +26,10 @@ function greeting(): string {
 
 export default async function AdminDashboardPage() {
   const session = await requireManager();
-  const [stats, upcoming] = await Promise.all([
+  const [stats, upcoming, attention] = await Promise.all([
     getDashboardStats(),
     listUpcomingBookings(),
+    getAttentionCounts(),
   ]);
   const firstName = (session.user.name ?? "Manager").split(" ")[0];
 
@@ -38,6 +41,45 @@ export default async function AdminDashboardPage() {
       <p className="type-body-md text-muted mt-2">
         Here is a summary of your portfolio for today.
       </p>
+
+      {attention.total > 0 && (
+        <div
+          role="status"
+          className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 rounded border border-error/30 bg-error-container/40 px-5 py-4"
+        >
+          <BellRing className="h-5 w-5 flex-none text-error" strokeWidth={1.5} />
+          <div className="min-w-0 flex-1">
+            <p className="type-body-md font-medium text-on-error-container">
+              Waiting for your decision
+            </p>
+            <ul className="type-body-md mt-1 text-on-error-container">
+              {attention.requests > 0 && (
+                <li>
+                  {attention.requests} booking request
+                  {attention.requests === 1 ? "" : "s"} to approve or decline
+                </li>
+              )}
+              {attention.cancellations > 0 && (
+                <li>
+                  {attention.cancellations} guest
+                  {attention.cancellations === 1 ? " has" : "s have"} asked to
+                  cancel a confirmed stay
+                </li>
+              )}
+            </ul>
+          </div>
+          <Link
+            href={
+              attention.requests > 0
+                ? "/admin/bookings?tab=pending"
+                : "/admin/bookings"
+            }
+            className={buttonVariants({ size: "sm" })}
+          >
+            Review now
+          </Link>
+        </div>
+      )}
 
       <div className="mt-10 grid gap-6 sm:grid-cols-3">
         <Card>
