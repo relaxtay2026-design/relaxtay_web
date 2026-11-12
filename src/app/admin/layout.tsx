@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { requireManager, signOut } from "@/lib/auth";
 import { brand } from "@/lib/brand";
+import { getAttentionCounts } from "@/server/admin/queries";
 import { AdminSidebar } from "./sidebar";
 
 /** Manager shell (mock 7/8): functional, efficient, clear (PRD §3.7). */
@@ -11,6 +12,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await requireManager();
+  const attention = await getAttentionCounts();
 
   async function signOutAction() {
     "use server";
@@ -29,6 +31,7 @@ export default async function AdminLayout({
           </p>
         </div>
         <AdminSidebar
+          attention={attention}
           signOutSlot={
             <form action={signOutAction}>
               <button

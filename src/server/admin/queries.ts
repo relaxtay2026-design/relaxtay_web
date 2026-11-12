@@ -62,12 +62,56 @@ export async function listAdminBookings(
       checkIn: { gte: today },
     }),
   };
-  return db.booking.findMany({
+  const rows = await db.booking.findMany({
     where,
     include: adminBookingInclude,
     orderBy: [{ checkIn: "asc" }],
     take: 200,
   });
+  // Whatever is waiting on the manager goes first, newest request on top,
+  // so a new request is never buried under older stays. The rest keeps its
+  // stay-date order.
+  const waiting = rows
+    .filter(needsManagerAction)
+    .sort((a, b) => waitingSince(b) - waitingSince(a));
+  return [...waiting, ...rows.filter((b) => !needsManagerAction(b))];
+}
+
+type AttentionFields = {
+  status: BookingStatus;
+  createdAt: Date;
+  cancellationRequestedAt: Date | null;
+};
+
+/** A request to approve, or a guest's cancellation request to act on. */
+export function needsManagerAction(b: AttentionFields): boolean {
+  if (b.status === "pending") return true;
+  return b.status === "confirmed" && b.cancellationRequestedAt !== null;
+}
+
+function waitingSince(b: AttentionFields): number {
+  return (b.cancellationRequestedAt ?? b.createdAt).getTime();
+}
+
+export type AttentionCounts = {
+  /** Booking requests waiting to be approved or declined. */
+  requests: number;
+  /** Confirmed stays whose guest has asked to cancel. */
+  cancellations: number;
+  total: number;
+};
+
+/** What the manager still has to act on — drives the sidebar dot. */
+export async function getAttentionCounts(): Promise<AttentionCounts> {
+  await requireManager();
+  await expireStalePending();
+  const [requests, cancellations] = await Promise.all([
+    db.booking.count({ where: { status: "pending" } }),
+    db.booking.count({
+      where: { status: "confirmed", cancellationRequestedAt: { not: null } },
+    }),
+  ]);
+  return { requests, cancellations, total: requests + cancellations };
 }
 
 export async function getAdminBooking(id: string) {
