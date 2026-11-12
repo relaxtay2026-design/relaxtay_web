@@ -44,3 +44,46 @@ export function getUserBooking(id: string, userId: string, email: string) {
     include: bookingInclude,
   });
 }
+
+const ownedBy = (userId: string, email: string) => ({
+  OR: [{ userId }, { guestEmail: email.toLowerCase() }],
+});
+
+/** Status changes the guest hasn't seen yet (confirmed, declined, cancelled). */
+export function listGuestUpdates(userId: string, email: string) {
+  return db.booking.findMany({
+    where: { ...ownedBy(userId, email), guestUpdateAt: { not: null } },
+    select: {
+      id: true,
+      status: true,
+      checkIn: true,
+      checkOut: true,
+      property: { select: { title: true } },
+    },
+    orderBy: { guestUpdateAt: "desc" },
+    take: 20,
+  });
+}
+
+export function countGuestUpdates(userId: string, email: string) {
+  return db.booking.count({
+    where: { ...ownedBy(userId, email), guestUpdateAt: { not: null } },
+  });
+}
+
+/** The guest has now seen these bookings' current status. */
+export function markGuestUpdatesSeen(
+  userId: string,
+  email: string,
+  bookingIds: string[]
+) {
+  if (bookingIds.length === 0) return Promise.resolve({ count: 0 });
+  return db.booking.updateMany({
+    where: {
+      ...ownedBy(userId, email),
+      id: { in: bookingIds },
+      guestUpdateAt: { not: null },
+    },
+    data: { guestUpdateAt: null },
+  });
+}

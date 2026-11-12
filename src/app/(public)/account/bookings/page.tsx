@@ -9,6 +9,7 @@ import { formatDateRange, todayUTC } from "@/lib/dates";
 import { Card, CardSection } from "@/components/ui/card";
 import { StatusChip, type ChipStatus } from "@/components/ui/status-chip";
 import { cn } from "@/lib/utils";
+import { MarkSeen } from "../mark-seen";
 
 export const metadata: Metadata = { title: "My stays" };
 
@@ -30,8 +31,18 @@ export default async function MyStaysPage({
       : b.checkOut < today || ["cancelled", "declined"].includes(b.status)
   );
 
+  // Bookings with an update the guest hasn't seen: flagged here, and marked
+  // seen once this list is on screen. Updates in the other tab are counted
+  // on that tab so nothing is hidden.
+  const isUpdated = (b: (typeof all)[number]) => b.guestUpdateAt !== null;
+  const seenNow = bookings.filter(isUpdated).map((b) => b.id);
+  const otherTabUpdates = all.filter(
+    (b) => isUpdated(b) && !bookings.includes(b)
+  ).length;
+
   return (
     <main>
+      <MarkSeen ids={seenNow} />
       <h1 className="type-display-md">My stays</h1>
 
       <div className="mt-8 flex gap-8 border-b border-divider">
@@ -47,6 +58,11 @@ export default async function MyStaysPage({
             )}
           >
             {t === "upcoming" ? "Upcoming" : "Past"}
+            {t !== tab && otherTabUpdates > 0 && (
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1.5 align-middle text-[11px] font-semibold leading-none tracking-normal text-white">
+                {otherTabUpdates}
+              </span>
+            )}
           </Link>
         ))}
       </div>
@@ -86,7 +102,14 @@ export default async function MyStaysPage({
                         {b.guestCount} guest{b.guestCount === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <StatusChip status={b.status as ChipStatus} />
+                    <div className="flex items-center gap-2">
+                      {isUpdated(b) && (
+                        <span className="type-label rounded-full bg-error px-2 py-0.5 text-white">
+                          Updated
+                        </span>
+                      )}
+                      <StatusChip status={b.status as ChipStatus} />
+                    </div>
                   </div>
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <p className="type-body-md">

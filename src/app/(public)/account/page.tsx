@@ -3,7 +3,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { nextUpcomingBooking } from "@/server/account/queries";
+import {
+  listGuestUpdates,
+  nextUpcomingBooking,
+} from "@/server/account/queries";
+import { UpdatesBar } from "./updates-bar";
 import { imageUrl } from "@/lib/images";
 import { formatDateRange } from "@/lib/dates";
 import { Card, CardSection } from "@/components/ui/card";
@@ -26,15 +30,16 @@ export default async function AccountOverviewPage({
 }: PageProps<"/account">) {
   const session = await requireUser();
   const welcome = (await searchParams).welcome === "1";
-  const next = await nextUpcomingBooking(
-    session.user.id,
-    session.user.email ?? ""
-  );
+  const [next, updates] = await Promise.all([
+    nextUpcomingBooking(session.user.id, session.user.email ?? ""),
+    listGuestUpdates(session.user.id, session.user.email ?? ""),
+  ]);
   const firstName = (session.user.name ?? "there").split(" ")[0];
 
   return (
     <main>
       {welcome && <WelcomeNote />}
+      <UpdatesBar updates={updates} />
       <h1 className="type-display-md">
         {greeting()}, {firstName}.
       </h1>

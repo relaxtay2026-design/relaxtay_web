@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { CircleUserRound, LayoutDashboard, LogOut, Luggage, User } from "lucide-react";
 import { signOutAction } from "@/app/(public)/account/actions";
 import { cn } from "@/lib/utils";
+import { countLabel, useGuestUpdates } from "@/components/public/use-guest-updates";
 
 type SessionUser = { name: string; email: string; isManager: boolean };
 
@@ -67,6 +68,8 @@ export function ProfileMenu() {
     };
   }, [pathname, signingOut]);
 
+  const updates = useGuestUpdates(Boolean(session));
+
   React.useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
@@ -108,13 +111,21 @@ export function ProfileMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={`Account menu — signed in as ${name}`}
+        aria-label={`Account menu — signed in as ${name}${updates > 0 ? ` — ${countLabel(updates)}` : ""}`}
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-full bg-ink font-display text-lg text-ivory transition-opacity hover:opacity-85",
+          "relative flex h-9 w-9 items-center justify-center rounded-full bg-ink font-display text-lg text-ivory transition-opacity hover:opacity-85",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bronze"
         )}
       >
         {initial}
+        {updates > 0 && (
+          <span
+            aria-hidden
+            className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-ivory bg-error px-1 font-sans text-[11px] font-semibold leading-none text-white"
+          >
+            {updates}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -141,6 +152,7 @@ export function ProfileMenu() {
               onNavigate={() => setOpen(false)}
             >
               My stays
+              {updates > 0 && <RedCount n={updates} />}
             </MenuLink>
             <MenuLink
               href="/account/profile"
@@ -166,6 +178,17 @@ export function ProfileMenu() {
         </div>
       )}
     </div>
+  );
+}
+
+function RedCount({ n }: { n: number }) {
+  return (
+    <span
+      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1.5 text-[11px] font-semibold leading-none text-white"
+      title={countLabel(n)}
+    >
+      {n}
+    </span>
   );
 }
 

@@ -9,6 +9,7 @@ import { brand } from "@/lib/brand";
 import { todayUTC } from "@/lib/dates";
 import { CancellationRequestEmail } from "@/components/email/cancellation-request";
 import { requestPasswordChange } from "@/server/auth/account";
+import { markGuestUpdatesSeen } from "@/server/account/queries";
 
 export type AccountFormState = { error: string | null; saved?: boolean };
 
@@ -133,4 +134,11 @@ export async function requestCancellationAction(
 
   revalidatePath(`/account/bookings/${booking.id}`);
   return { error: null, saved: true };
+}
+
+/** Called once the guest has had the updated bookings on screen. */
+export async function markUpdatesSeenAction(bookingIds: string[]): Promise<void> {
+  const session = await requireUser();
+  const ids = bookingIds.filter((id) => typeof id === "string").slice(0, 50);
+  await markGuestUpdatesSeen(session.user.id, session.user.email ?? "", ids);
 }
