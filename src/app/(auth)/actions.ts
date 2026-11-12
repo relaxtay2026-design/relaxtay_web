@@ -112,7 +112,8 @@ export async function claimAction(
     await signIn("credentials", {
       email,
       password,
-      redirectTo: "/account",
+      // ?welcome shows the "your account is ready" note once
+      redirectTo: "/account?welcome=1",
     });
     return { error: null };
   } catch (e) {

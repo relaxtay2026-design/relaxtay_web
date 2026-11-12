@@ -7,6 +7,7 @@ import { createToken, consumeToken, peekToken } from "./tokens";
 import {
   AccountExistsEmail,
   AccountInvitationEmail,
+  PasswordChangeEmail,
   PasswordResetEmail,
 } from "@/components/email/account-emails";
 import { brand } from "@/lib/brand";
@@ -172,6 +173,36 @@ export async function requestPasswordReset(email: string): Promise<void> {
     subject: "Reset your password",
     react: <PasswordResetEmail resetUrl={`${site()}/reset-password/${raw}`} />,
   });
+}
+
+/**
+ * Signed-in "Change password" (or "Set a password" for Google-only
+ * accounts). Nothing changes until the owner of the account's email opens
+ * the link we send there, so a session left open on a shared computer
+ * cannot be used to take the account over. The link leads to the same
+ * page as a password reset; saving there signs every device out.
+ */
+export async function requestPasswordChange(
+  email: string,
+  hasPassword: boolean
+): Promise<"sent" | "rate_limited"> {
+  const address = email.toLowerCase();
+  if (!(await withinLimit("reset-email", address, AUTH_LIMITS.emailPerAddress)))
+    return "rate_limited";
+  const raw = await createToken(address, "reset");
+  await sendEmail({
+    to: address,
+    subject: hasPassword
+      ? "Confirm your password change"
+      : `Set a password for your ${brand.name} account`,
+    react: (
+      <PasswordChangeEmail
+        url={`${site()}/reset-password/${raw}`}
+        hasPassword={hasPassword}
+      />
+    ),
+  });
+  return "sent";
 }
 
 /** Complete a reset: new password + activate (email now verified). */

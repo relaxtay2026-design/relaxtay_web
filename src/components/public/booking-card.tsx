@@ -12,6 +12,8 @@ import {
   eachNight,
   addDays,
   todayUTC,
+  pickerDayToDateOnly,
+  dateOnlyToPickerDay,
 } from "@/lib/dates";
 import { MAX_ADVANCE_DAYS, MAX_NIGHTS } from "@/lib/booking-limits";
 import { Card, CardSection, Divider } from "@/components/ui/card";
@@ -86,47 +88,89 @@ export function BookingCard({
     if (be && BOUNCE_ERRORS[be]) {
       setError(BOUNCE_ERRORS[be]);
       setCalendarOpen(true);
-      params.delete("be");
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash
-      );
+      // The page renders two cards (sidebar on desktop, inline on phones)
+      // and both must read ?be= before it is cleared, or the phone card —
+      // the visible one there — never shows the message.
+      const timer = setTimeout(() => {
+        const now = new URLSearchParams(window.location.search);
+        if (!now.has("be")) return;
+        now.delete("be");
+        const qs = now.toString();
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash
+        );
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [loadAvailability]);
 
+  // The server's calendar runs on UTC dates; these are the same days as the
+  // picker shows them (see pickerDayToDateOnly in lib/dates).
+  /** First day a stay can start: today, by the server's calendar. */
+  const firstBookableDay = React.useMemo(
+    () => dateOnlyToPickerDay(toDateOnlyString(todayUTC()))!,
+    []
+  );
   /** Latest check-out the server accepts (MAX_ADVANCE_DAYS from today). */
   const lastBookableDay = React.useMemo(
-    () => addDays(todayUTC(), MAX_ADVANCE_DAYS),
+    () =>
+      dateOnlyToPickerDay(
+        toDateOnlyString(addDays(todayUTC(), MAX_ADVANCE_DAYS))
+      )!,
     []
   );
 
   const disabled = React.useMemo(() => {
     const days = (availability?.unavailable ?? [])
-      .map(parseDateOnly)
+      .map(dateOnlyToPickerDay)
       .filter((d): d is Date => d !== null);
-    return [{ before: new Date() }, { after: lastBookableDay }, ...days];
-  }, [availability, lastBookableDay]);
+    return [{ before: firstBookableDay }, { after: lastBookableDay }, ...days];
+  }, [availability, firstBookableDay, lastBookableDay]);
 
-  const nights =
-    range?.from && range?.to ? nightsBetween(range.from, range.to) : 0;
+  /** The picked stay as server dates (UTC midnight), or null. */
+  const stay = React.useMemo(() => {
+    if (!range?.from || !range?.to) return null;
+    const checkIn = parseDateOnly(pickerDayToDateOnly(range.from));
+    const checkOut = parseDateOnly(pickerDayToDateOnly(range.to));
+    return checkIn && checkOut ? { checkIn, checkOut } : null;
+  }, [range]);
+
+  const nights = stay ? nightsBetween(stay.checkIn, stay.checkOut) : 0;
   const validStay = nights >= minNights;
+
+  // Bring any problem into view at once — the card can be below the fold
+  // on a phone, or the message below the calendar.
+  const errorRef = React.useRef<HTMLParagraphElement>(null);
+  React.useEffect(() => {
+    if (error)
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error]);
+
+  /**
+   * Every rule the booking page enforces, checked here first so a problem
+   * shows instantly in the card instead of after a reload.
+   */
+  function stayProblem(): string | null {
+    if (!stay) return BOUNCE_ERRORS.dates;
+    const today = todayUTC();
+    if (stay.checkIn < today) return BOUNCE_ERRORS.past;
+    if (stay.checkOut <= stay.checkIn) return BOUNCE_ERRORS.order;
+    if (stay.checkOut > addDays(today, MAX_ADVANCE_DAYS))
+      return BOUNCE_ERRORS.far;
+    if (nights > MAX_NIGHTS) return BOUNCE_ERRORS.max;
+    if (!validStay) return `Minimum stay is ${minNights} nights for this property.`;
+    return null;
+  }
 
   /** Fast client-side + fresh-fetch validation before navigating. */
   async function requestStay() {
     setError(null);
-    if (!range?.from || !range?.to) {
-      setError(BOUNCE_ERRORS.dates);
+    const problem = stayProblem();
+    if (problem || !stay) {
+      setError(problem ?? BOUNCE_ERRORS.dates);
       setCalendarOpen(true);
-      return;
-    }
-    if (!validStay) {
-      setError(`Minimum stay is ${minNights} nights for this property.`);
-      return;
-    }
-    if (nights > MAX_NIGHTS) {
-      setError(BOUNCE_ERRORS.max);
       return;
     }
     setChecking(true);
@@ -134,7 +178,9 @@ export function BookingCard({
     setChecking(false);
     if (fresh) {
       const taken = new Set(fresh.unavailable);
-      const clash = eachNight(range.from, range.to).some((n) => taken.has(n));
+      const clash = eachNight(stay.checkIn, stay.checkOut).some((n) =>
+        taken.has(n)
+      );
       if (clash) {
         setError(BOUNCE_ERRORS.unavail);
         setRange(undefined);
@@ -143,7 +189,7 @@ export function BookingCard({
       }
     }
     router.push(
-      `/booking/${slug}?checkIn=${toDateOnlyString(range.from)}&checkOut=${toDateOnlyString(range.to)}&guests=${guests}`
+      `/booking/${slug}?checkIn=${toDateOnlyString(stay.checkIn)}&checkOut=${toDateOnlyString(stay.checkOut)}&guests=${guests}`
     );
   }
 
@@ -236,6 +282,7 @@ export function BookingCard({
 
         {error && (
           <p
+            ref={errorRef}
             role="alert"
             className="type-body-md mt-4 rounded border border-error/30 bg-error-container/40 px-3 py-2.5 text-on-error-container"
           >
