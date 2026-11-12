@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import type { ReactElement } from "react";
+import { brand } from "@/lib/brand";
 
 /**
  * Transactional email transport. Falls back to console logging when
@@ -9,6 +10,9 @@ import type { ReactElement } from "react";
  * Until a sending domain is verified in Resend, MAIL_FROM stays
  * onboarding@resend.dev and Resend only delivers to the account
  * owner's inbox — set MANAGER_EMAIL to that address for testing.
+ *
+ * Guest replies go to REPLY_TO, or the brand's contact address, so they
+ * reach a real inbox whatever address the mail is sent from.
  */
 export async function sendEmail(opts: {
   to: string;
@@ -26,6 +30,7 @@ export async function sendEmail(opts: {
     const { error } = await resend.emails.send({
       from,
       to: opts.to,
+      replyTo: process.env.REPLY_TO || brand.email,
       subject: opts.subject,
       react: opts.react,
     });
