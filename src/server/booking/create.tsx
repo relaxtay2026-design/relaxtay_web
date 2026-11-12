@@ -222,7 +222,7 @@ function isOverlapViolation(e: unknown): boolean {
 }
 
 /**
- * Human booking reference, e.g. LUM-482915: prefix + 6 random digits.
+ * Human booking reference, e.g. RLX-482915: prefix + 6 random digits.
  *
  * Random rather than counted: a reference derived from the booking count
  * lands in the same narrow range as its neighbours and collides with them.
